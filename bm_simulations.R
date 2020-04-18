@@ -1,30 +1,14 @@
 #### Brownian Motion Simulations
 
-# If you run the code directly, you will create three data frames. The first compares values of standard
-# Brownian motion from different functions. The second does the same for arithmetic Brownian motion and 
-# the last one for geometric Brownian motion. Each data frame has 10 rows, each row showing the values 
-# of the Brownian motion at a given time point for different functions, for a total of 10 time points. 
-# The code that produces these data frames is under the heading "Comparisons". You can play with that 
-# to generate different data. 
-
-# The organization of this file is as follows. The file starts with the header "My functions". This 
-# section has Brownian motions functions that I wrote myself. "my_bm", which is my standard Brownian 
-# motion function, gives different numbers compared to arithmetic BM with 0 mean (including my own ABM)
-# I thought they wouldn't differ, but it is not important beause they both give BM with no drift, their 
-# graphs are identical and their means are super close. I will fix that later. 
-
-# Next, you will see the header "Package functions". This includes functions from the packages 
-# "somebm", "fExpressCertificates" and "yuima". The first two give the same results as my functions. 
-# "yuima" differs slightly most of the time and considerably for certain parameter values. I specified 
-# these conditions next to the code. Finally, you will see the header "Visualizations. You can play with 
-# it as you wish. When you run the code at once, it will give a graph of ABM with negative drift. 
+# The section "Simulations", which is at the bottom of the file, has the parallel runs and two functions to store values. 
+# Make sure you run these two functions as well as the functions "my_bm" and "my_gbm" before the parallel simulations. 
 
 ### Install the required packages
 #install.packages("fExpressCertificates")
 #install.packages("somebm")
 #install.packages("yuima")
 
-### Load the required packages
+### Load the function packages
 library(fExpressCertificates)
 library(somebm)
 library(yuima)
@@ -249,105 +233,28 @@ hittings <- function(x, nsim, n){
   return(store)
 }
 
-## from t = 0 to t = 1, n = 100 increments / time intervals and nsim = 10,000 sample paths 
+## Parallel runs 
 
-# Arithmetic Brownian Motion 
-f1 <- function(i){ # specify the desired function and parameter values here
-  my_abm(nsim = 1, t = 1, n = 100, X0 = 1, mu = -0.2, sigma = -0.1, L = 0.9999) # keep nsim = 1 for now, will change later
+f <- function(i){ # specify the desired function and parameter values here
+  my_gbm(nsim = 1, t = 1, n = 100, X0 = 1, mu = -1.25, sigma = 0.15, L = 0) # keep nsim = 1 for now, will change later
   
 }
 
 set.seed(1)
-abm102 <- mclapply(X = 1:10000, f1, mc.cores = 8, mc.set.seed = TRUE) # X is the n of sim as a vector 
-                                                                    # f is the function defined above 
-                                                                    # n of cores you want to use 
+res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE) # X is the n of sim as a vector 
+                                                                # f is the function defined above 
+                                                                # mc.cores is the number of cores you want to use 
 
-s1 <- values(x = abm102, nsim = 10000, n = 100) # indexing the BM values 
-mval1 <- s1[[1]] # BM values in a matrix (goes into the plotting function)
-dfval1 <- s1[[2]] # BM values in a data frame
+s <- values(x = res, nsim = 100, n = 100) # indexing the BM values 
+mval <- s[[1]] # BM values in a matrix (goes into the plotting function)
+dfval <- s[[2]] # BM values in a data frame
 
-h1 <- hittings(x = abm102, nsim = 10000, n = 100) # indexing the hitting times 
-mhit1 <- h1[[1]] # in a matrix (for histograms)
-dfhit1 <- h1[[2]] # in a data frame 
+h <- hittings(x = res, nsim = 100, n = 100) # indexing the hitting times 
+mhit <- h[[1]] # in a matrix (for histograms)
+dfhit <- h[[2]] # in a data frame 
 
-p1 <- bmplot(x = mval1, nsim = 10000, t = 1, n = 100, L = 0.9999, ylim = c(min(mval1), max(mval1)), # Define the range of the y-axis  
-       title = "Arithmetic Brownian motion with negative drift and an absorbing barrier")
-print(p1)
-
-hist(mhit1) # Histogram of hitting times 
-
-
-# Geometric Brownian Motion 
-f2 <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t = 1, n = 100, X0 = 1, mu = -0.2, sigma = 0.1, L = 0.9999) # keep nsim = 1 for now, will change later
-  
-}
-
-set.seed(1)
-gbm102 <- mclapply(X = 1:10000, f2, mc.cores = 8, mc.set.seed = TRUE) 
-
-s2 <- values(x = gbm102, nsim = 10000, n = 100)
-mval2 <- s2[[1]] # BM values in a matrix (goes into the plotting function)
-dfval2 <- s2[[2]] # BM values in a data frame
-
-h2 <- hittings(x = gbm102, nsim = 10000, n = 100)
-mhit2 <- h2[[1]] # as matrix (for histograms)
-dfhit2 <- h2[[2]] # as data frame 
-p2 <- bmplot(x = mval2, nsim = 10000, t = 1, n = 100, L = 0.9999, ylim = c(min(mval2), max(mval2)), # Define the range of the y-axis  
-             title = "Geometric Brownian motion with negative drift and an absorbing barrier")
-print(p2)
-
-hist(mhit2) # Histogram of hitting times 
-
-
-## from 0 to 1, n = 10,000 time points and nsim = 10,000 sample paths
-
-# Arithmetic Brownian Motion 
-f3 <- function(i){ # specify the desired function and parameter values here
-  my_abm(nsim = 1, t = 1, n = 10000, X0 = 1, mu = -0.2, sigma = 0.1, L = 0.9999) # keep nsim = 1 for now, will change later
-  
-}
-
-set.seed(1)
-abm104 <- mclapply(X = 1:10000, f3, mc.cores = 8, mc.set.seed = TRUE) # X is the n of sim as a vector 
-# f is the function defined above 
-# n of cores you want to use 
-
-s3 <- values(x = abm102, nsim = 10000, n = 10000)
-mval3 <- s3[[1]] # BM values in a matrix (goes into the plotting function)
-dfval3 <- s3[[2]] # BM values in a data frame
-
-h3 <- hittings(x = abm102, nsim = 10000, n = 10000)
-mhit3 <- h3[[1]] # as matrix (for histograms)
-dfhit3 <- h3[[2]] # as data frame 
-
-p3 <- bmplot(x = mval3, nsim = 10000, t = 1, n = 10000, L = , ylim = c(min(mval3), max(mval3)), # Define the range of the y-axis  
+p <- bmplot(x = mval, nsim = 100, t = 1, n = 100, L = 0, ylim = c(-0.5, 1), # Define the range of the y-axis  
              title = "Arithmetic Brownian motion with negative drift and an absorbing barrier")
-print(p3)
+print(p)
 
-hist(mhit3) # Histogram of hitting times 
-max(mhit3)
-
-# Geometric Brownian Motion  
-f4 <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t = 1, n = 10000, X0 = 1, mu = -0.2, sigma = 0.1, L = 0.9999) # keep nsim = 1 for now, will change later
-  
-}
-
-set.seed(1)
-gbm104 <- mclapply(X = 1:10000, f4, mc.cores = 8, mc.set.seed = TRUE) 
-
-s4 <- values(x = gbm104, nsim = 10000, n = 10000)
-mval4 <- s4[[1]] # BM values in a matrix (goes into the plotting function)
-dfval4 <- s4[[2]] # BM values in a data frame
-
-h4 <- hittings(x = abm104, nsim = 10000, n = 10000)
-mhit4 <- h4[[1]] # as matrix (for histograms)
-dfhit4 <- h4[[2]] # as data frame 
-
-p4 <- bmplot(x = mval4, nsim = 10000, t = 1, n = 10000, L = , ylim = c(min(mval4), max(mval4)), # Define the range of the y-axis  
-             title = "Geometric Brownian motion with negative drift and an absorbing barrier")
-print(p4)
-
-hist(mhit4, xlim = c(0, 10000)) # Histogram of hitting times 
-max(mhit4)
+hist(mhit) # Histogram of hitting times 
