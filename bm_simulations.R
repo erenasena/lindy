@@ -1,7 +1,7 @@
 #### Brownian Motion Simulations
 
 # The section "Simulations", which is at the bottom of the file, has the parallel runs and two functions to store values. 
-# Make sure you run these two functions as well as the functions "my_bm" and "my_gbm" before the parallel simulations. 
+# Make sure you run these two functions as well as the functions "my_bm", "my_gbm", and "bmplot" before the parallel simulations. 
 
 ### Install the required packages
 #install.packages("fExpressCertificates")
