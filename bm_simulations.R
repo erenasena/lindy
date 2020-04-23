@@ -113,7 +113,7 @@ set.seed(1)
 m <- setModel(drift = "mu*s", diffusion = "sigma*s", state.var = "s", time.var = "t", solve.var = "s", xinit = 1)
 options(warn = -1)# Suppress Warnings from R
 simnum <- 100 # number of BMs to be simulated 
-grid <- setSampling(Initial = 1, Terminal = 1, n = 100) # Initial is the first time point, Terminal is the last time point, n is the number of intervals 
+grid <- setSampling(Initial = 0, Terminal = 1, n = 100) # Initial is the first time point, Terminal is the last time point, n is the number of intervals 
 newsim <- function(i){simulate(m, sampling = grid, true.param = list(mu = -1, sigma = 1))@data@original.data}
 options(warn = -1)# Suppress Warnings from R
 sim <- sapply(1:simnum, function(x)newsim(x))
