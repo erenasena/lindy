@@ -1,0 +1,227 @@
+#### Brownian Motion Simulations
+
+### Running this whole thing should give a plot for BM with no drift, a histogram of 
+### its hitting times, and a hazard rate calculated based on those hitting times. I did
+### not write the hazard function myself.
+
+# The necessary packages
+#install.packages("survminer")
+#install.packages("survival")
+#install.packages("dplyr")
+
+# The necessary libraries 
+library(ggplot2)
+library(reshape2)
+library(parallel)
+library(survminer)
+library(survival)
+library(dplyr)
+
+### The BM functions 
+
+## Standard Brownian Motion
+my_bm <- function(nsim, t0, t, n, X0, L){ # nsim is the number of BM sample paths to be simulated 
+  # t is the final time point 
+  # n is the number of time intervals/increments from 0:t
+  # X0 is the first value of BM at time 0, mu is the drift 
+  # sigma is the diffusion coefficient and L is the barrier
+  
+  dt <- t/n # time divided into equal intervals; change in time and also the variance of the increments
+  sigma = sqrt(dt)
+  time <- seq(from = t0, to = t, by = dt) # a time vector that determines the number of columns, with rows being the simulated sample paths  
+  initial <- X0 
+  X <- matrix(nrow = nsim, ncol = length(time)) # the matrix that will store all the values
+  X[1:nsim, 1] <- X0
+  event_time <- numeric(length = nsim) # these are the hitting times
+  event_status <- numeric(length = nsim) # 1 = dead, 0 = censored if not dead until the last time point
+  
+  for(i in 1:nrow(X)){
+    for(j in 2:length(time)){
+      X[i,j] <- X0 + rnorm(n = 1, mean = 0, sd = sigma) # the formula for the next value of BM
+      if(X[i,j] > L & j < ncol(X)){ # if we have not reached either the barrier or the last time point 
+        X0 <- X[i,j] # update the initial value by the current value 
+      } else if(X[i,j] > L & j == ncol(X)){ # have not hit the barrier but the simulation is done
+        X0 <- initial # update the initial value by the value we set in the beginning and start the next simulation
+        event_time[i] <- ncol(X) # the censoring time is the last time point
+        event_status[i] <- 0 # censored, not dead 
+      } else if(X[i,j] <= L){ # we hit # if we have hit the absorbing barrier from above
+        X0 <- initial # move on to the next simulation 
+        event_time[i] <- j # hitting time
+        event_status[i] <- 1 # dead 
+        break
+      }
+    }
+    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+  }
+  return(values)
+}
+
+## Arithmetic Brownian Motion (with drift and absorbing barrier) 
+my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L){ # same as above, except now we have mu for drift 
+  # sigma is the diffusion coefficient / volatility 
+  # also added a t0 term, which is just 0 in practice
+  
+  dt <- t/n 
+  time <- seq(from = t0, to = t, by = dt) # a time vector that determines the number of columns, with rows being the simulated sample paths  
+  initial <- X0  
+  X <- matrix(nrow = nsim, ncol = length(time)) 
+  X[1:nsim, 1] <- X0
+  event_time <- numeric(length = nsim) # I changed the hitting times to event time and 
+  event_status <- numeric(length = nsim) # added an event status indicating if failure happened or not
+  
+  for(i in 1:nrow(X)){
+    for(j in 2:length(time)){
+      X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1) 
+      if(X[i,j] > L & j < ncol(X)){ 
+        X0 <- X[i,j] 
+      } else if(X[i,j] > L & j == ncol(X)){ 
+        X0 <- initial 
+        event_time[i] <- ncol(X) 
+        event_status[i] <- 0 # censored, did not die until the last point 
+      } else if(X[i,j] <= L){ 
+        X0 <- initial 
+        event_time[i] <- j 
+        event_status[i] <- 1 # hit the boundary, dead 
+        break
+      }
+    }
+    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+  }
+  return(values)
+}
+
+## Geometric Brownian Motion (with absorbing barrier)
+# The only difference between this and the ABM function is the formula. The variables are the same. 
+my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L){ 
+  dt <- t/n 
+  sig2 <- sigma^2 
+  time <- seq(from = t0, to = t, by = dt)  
+  
+  initial <- X0  
+  X <- matrix(nrow = nsim, ncol = length(time)) 
+  X[1:nsim, 1] <- X0 
+  event_time <- numeric(length = nsim)
+  event_status <- numeric(length = nsim)
+  
+  for(i in 1:nrow(X)){
+    for(j in 2:length(time)){
+      X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
+      if(X[i,j] > L & j < ncol(X)){ 
+        X0 <- X[i,j]  
+      } else if(X[i,j] > L & j == ncol(X)){ 
+        X0 <- initial  
+        event_time[i] <- ncol(X) 
+        event_status[i] <- 0
+      } else if(X[i,j] <= L){ 
+        X0 <- initial  
+        event_time[i] <- j
+        event_status[i] <- 1
+        break
+      }
+    }
+    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+  }
+  return(values)
+}
+
+### Visualizations
+bmplot <- function(x, nsim, n, L, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
+  rownames(x) <- paste("sim", seq(nsim), sep = "") # the number of simulations / rows
+  colnames(x) <- paste("time", seq(0:n), sep = "") # the number of time points - 0:100 at the moment / columns 
+  dat <- as.data.frame(x) # creating the data frame for ggplot 
+  dat$sim <- rownames(dat)
+  mdat <- melt(dat, id.vars = "sim")
+  mdat$time <- as.numeric(gsub("time", "", mdat$variable))
+  
+  p <- ggplot(data = mdat, mapping = aes(x = time, y = value, group = sim)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(), 
+          plot.title = element_text(hjust = 0.5),
+          axis.title.y = element_text(angle = 0, size = 11, margin = margin(t = 0, r = 10, b = 0, l = 0)), 
+          axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
+    geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
+    ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + geom_hline(yintercept = L, color = "orange", size = 0.3)
+  return(p)
+}
+
+
+### Simulations
+RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
+detectCores() # tells you the number of cores your computer can use for the simulations 
+
+## Storing the values: These two functions will allow us to nealty store the resutls. It is easier to 
+## define them before running the simulations. I wrote them because the results of parallel simulations are a mess. 
+
+# The BM values 
+values <- function(x, nsim, n){
+  u <- unlist(x)
+  u <- u[-which(names(u) == "Event time")]
+  u <- u[-which(names(u) == "Event status")]  
+  m <- matrix(data = u, nrow = nsim, ncol = length(0:n), byrow = TRUE)
+  df <- data.frame(x = t(m), row.names = paste0("Time", 0:n, ""))
+  colnames(x = df) <- paste0("Sim", 1:nsim, "")
+  store <- list(m, df)
+  return(store)
+}
+
+# The hitting times 
+times <- function(x, nsim, n){
+  u <- unlist(x)
+  u <- u[-which(names(u) != "Event time")]
+  m <- matrix(data = u, nrow = nsim, ncol = 1, byrow = TRUE)
+  df <- data.frame(x = m, row.names = paste0("Sim", 1:nsim, ""))
+  colnames(x = df) <- "Hitting time"
+  store <- list(m, df)
+  return(store)
+}
+
+# The event / censoring times 
+events <- function(x, nsim, n){
+  u <- unlist(x)
+  u <- u[-which(names(u) != "Event status")]
+  m <- matrix(data = u, nrow = nsim, ncol = 1, byrow = TRUE)
+  df <- data.frame(x = m, row.names = paste0("Sim", 1:nsim, ""))
+  colnames(x = df) <- "Event"
+  store <- list(m, df)
+  return(store)
+}
+
+## Parallel runs 
+f <- function(i){ # specify the desired function and parameter values here
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.9999) 
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.9999) 
+  my_bm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, L = 0.9999)
+}
+
+set.seed(1)
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE) # X is the n of sim as a vector 
+# f is the function defined above 
+# mc.cores is the number of cores you want to use 
+
+v <- values(x = res, nsim = 1000, n = 10000) # indexing the BM values 
+m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
+df_val <- v[[2]] # BM values in a data frame
+
+t <- times(x = res, nsim = 1000, n = 10000) # indexing the hitting times 
+m_times <- t[[1]] # in a matrix (for histograms)
+df_times <- t[[2]] # in a data frame 
+
+e <- events(x = res, nsim = 1000, n = 10000)
+m_event <- e[[1]] # in a matrix
+df_event <- e[[2]]
+
+p <- bmplot(x = m_val, nsim = 1000, n = 10000, L = 0.9999, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+            title = "Brownian motion with an absorbing barrier")
+print(p)
+
+hist(m_times) # Histogram of hitting times 
+#max(m_times)
+
+### Getting the hazard functions 
+surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
+surv_object <- Surv(time = m_times, event = m_event) 
+fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', ylim = c(-0.05, 0.05))
+
+
+
