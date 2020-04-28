@@ -113,7 +113,7 @@ set.seed(1)
 m <- setModel(drift = "mu*s", diffusion = "sigma*s", state.var = "s", time.var = "t", solve.var = "s", xinit = 1)
 options(warn = -1)# Suppress Warnings from R
 simnum <- 100 # number of BMs to be simulated 
-grid <- setSampling(Initial = 1, Terminal = 1, n = 100) # Initial is the first time point, Terminal is the last time point, n is the number of intervals 
+grid <- setSampling(Initial = 0, Terminal = 1, n = 100) # Initial is the first time point, Terminal is the last time point, n is the number of intervals 
 newsim <- function(i){simulate(m, sampling = grid, true.param = list(mu = -1, sigma = 1))@data@original.data}
 options(warn = -1)# Suppress Warnings from R
 sim <- sapply(1:simnum, function(x)newsim(x))
@@ -235,8 +235,10 @@ hittings <- function(x, nsim, n){
 
 ## Parallel runs 
 
+run_parallel <- function(args) {              
+              
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t = 1, n = 100, X0 = 1, mu = -1.25, sigma = 0.15, L = 0) # keep nsim = 1 for now, will change later
+  my_gbm(nsim = args$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L) # keep nsim = 1 for now, will change later
   
 }
 
@@ -258,3 +260,5 @@ p <- bmplot(x = mval, nsim = 100, t = 1, n = 100, L = 0, ylim = c(-0.5, 1), # De
 print(p)
 
 hist(mhit) # Histogram of hitting times 
+    
+}
