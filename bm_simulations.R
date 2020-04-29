@@ -235,11 +235,16 @@ hittings <- function(x, nsim, n){
 
 ## Parallel runs 
 
-run_parallel <- function(args) {              
-              
-f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = args$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L) # keep nsim = 1 for now, will change later
-  
+run_parallel <- function(args, function_choice){
+  if(function_choice == "abm"){ # specify the desired funciton here 
+    f <- function(i){ # the parameter values here
+      my_abm(nsim = args$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L)
+    }
+} else {
+    f <- function(i){
+      my_gbm(nsim = agrs$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L)
+    }
+  }
 }
 
 set.seed(1)
