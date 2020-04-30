@@ -242,7 +242,7 @@ run_parallel <- function(args, function_choice){
     }
 } else {
     f <- function(i){
-      my_gbm(nsim = agrs$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L)
+      my_gbm(nsim = args$nsim, t = args$t, n = args$n, X0 = args$xo, mu = args$mu, sigma = args$sigma, L = args$L)
     }
   }
 }
