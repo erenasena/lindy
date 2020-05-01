@@ -265,5 +265,3 @@ p <- bmplot(x = mval, nsim = 100, t = 1, n = 100, L = 0, ylim = c(-0.5, 1), # De
 print(p)
 
 hist(mhit) # Histogram of hitting times 
-    
-}
