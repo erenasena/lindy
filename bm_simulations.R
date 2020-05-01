@@ -260,8 +260,72 @@ h <- hittings(x = res, nsim = 100, n = 100) # indexing the hitting times
 mhit <- h[[1]] # in a matrix (for histograms)
 dfhit <- h[[2]] # in a data frame 
 
-p <- bmplot(x = mval, nsim = 100, t = 1, n = 100, L = 0, ylim = c(-0.5, 1), # Define the range of the y-axis  
-             title = "Arithmetic Brownian motion with negative drift and an absorbing barrier")
-print(p)
+#p <- bmplot(x = mval, nsim = 100, t = 1, n = 100, L = 0, ylim = c(-0.5, 1), # Define the range of the y-axis  
+             #title = "Arithmetic Brownian motion with negative drift and an absorbing barrier")
+#print(p)
 
 hist(mhit) # Histogram of hitting times 
+
+
+### Hazard functions 
+
+## Getting the hazard functions 
+surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
+surv_object <- Surv(time = m_times, event = m_event) 
+fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 10000), ylim = c(min(fit$haz), max(fit$haz)))
+
+## Hazard function trials with various distributions 
+
+# The hazard function of Pareto
+library(VGAM)
+hazard <- function(x, a, b){
+  fx <- dpareto(x, shape = a, scale = b)
+  dx <- ppareto(x, shape = a, scale = b)
+  sx <- 1-dx
+  hx <- fx/sx
+  return(hx)
+}
+plot(hazard(x = 1:100, a = 2, b = 1), type = "l")
+
+# The hazard function of exponential 
+eh <- function(x, b){
+  for(i in 1:100)
+    x[i] <- 1/b
+  return(x)
+}
+evalues <- eh(x = 1:100, b = 1)
+plot(evalues, type = "l")
+
+# The hazard function of Weibull 
+wh <- function(a, b, t){
+  h <- (b/a)*((t/a)^(b-1))
+  return(h)
+}
+wvalues <- wh(a = 1, b = 2, t = 1:100)
+plot(wvalues, type = 'l')
+
+## bshazard  
+library(bshazard)
+
+# Pareto: should be decreasing and it does
+set.seed(1)
+prt <- VGAM::rpareto(n = 1000, shape = 1.5, scale = 1)
+fit_1 <- bshazard(Surv(prt) ~ 1)
+plot(x = fit_1$time, y = fit_1$hazard, ylim =c(min(fit_1$haz), max(fit_1$haz)), 
+     xlab = "Time", ylab = "Hazard", type = 'l')
+
+# Exponential: should be constant and it is not
+set.seed(1)
+exps <- rexp(n = 1000, 1)
+fit_2 <- bshazard(Surv(exps) ~ 1)
+plot(x = fit_2$time, y = fit_2$hazard, ylim = c(min(fit_2$haz), max(fit_2$haz)), 
+     xlab = "Time", ylab = "Hazard", type = 'l')
+
+# Weibull: should be decreasing for shape < 1, constant for shape = 1, increasing for shape = 1
+# except for constant hazard, it's all good 
+set.seed(1)
+wei <- rweibull(n = 1000, shape = 1, scale = 1)
+fit_3 <- bshazard(Surv(wei) ~ 1)
+plot(x = fit_3$time, fit_3$hazard, ylim = c(min(fit_3$haz), max(fit_3$haz)), 
+     xlab = "Time", ylab = "Hazard", type = 'l')
