@@ -259,7 +259,7 @@ fit_1 <- bshazard(Surv(prt) ~ 1)
 plot(x = fit_1$time, y = fit_1$hazard, ylim =c(min(fit_1$haz), max(fit_1$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
 
-# Exponential: should be constant and it is not
+# Exponential: should be constant but it is not
 set.seed(1)
 exps <- rexp(n = 1000, 1)
 fit_2 <- bshazard(Surv(exps) ~ 1)
