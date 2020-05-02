@@ -252,7 +252,7 @@ plot(wvalues, type = 'l')
 ## bshazard  
 library(bshazard)
 
-# Pareto: should be decreasing and it does
+# Pareto: should be decreasing and it is
 set.seed(1)
 prt <- VGAM::rpareto(n = 1000, shape = 1.5, scale = 1)
 fit_1 <- bshazard(Surv(prt) ~ 1)
