@@ -1,8 +1,4 @@
-#### Brownian Motion Simulations
-
-### Running this whole thing should give a plot for BM with no drift, a histogram of 
-### its hitting times, and a hazard rate calculated based on those hitting times. I did
-### not write the hazard function myself.
+### Survival and hazard functions of hitting times 
 
 # The necessary packages
 #install.packages("survminer")
@@ -18,43 +14,6 @@ library(survival)
 library(dplyr)
 
 ### The BM functions 
-
-## Standard Brownian Motion
-my_bm <- function(nsim, t0, t, n, X0, L){ # nsim is the number of BM sample paths to be simulated 
-  # t is the final time point 
-  # n is the number of time intervals/increments from 0:t
-  # X0 is the first value of BM at time 0, mu is the drift 
-  # sigma is the diffusion coefficient and L is the barrier
-  
-  dt <- t/n # time divided into equal intervals; change in time and also the variance of the increments
-  sigma = sqrt(dt)
-  time <- seq(from = t0, to = t, by = dt) # a time vector that determines the number of columns, with rows being the simulated sample paths  
-  initial <- X0 
-  X <- matrix(nrow = nsim, ncol = length(time)) # the matrix that will store all the values
-  X[1:nsim, 1] <- X0
-  event_time <- numeric(length = nsim) # these are the hitting times
-  event_status <- numeric(length = nsim) # 1 = dead, 0 = censored if not dead until the last time point
-  
-  for(i in 1:nrow(X)){
-    for(j in 2:length(time)){
-      X[i,j] <- X0 + rnorm(n = 1, mean = 0, sd = sigma) # the formula for the next value of BM
-      if(X[i,j] > L & j < ncol(X)){ # if we have not reached either the barrier or the last time point 
-        X0 <- X[i,j] # update the initial value by the current value 
-      } else if(X[i,j] > L & j == ncol(X)){ # have not hit the barrier but the simulation is done
-        X0 <- initial # update the initial value by the value we set in the beginning and start the next simulation
-        event_time[i] <- ncol(X) # the censoring time is the last time point
-        event_status[i] <- 0 # censored, not dead 
-      } else if(X[i,j] <= L){ # we hit # if we have hit the absorbing barrier from above
-        X0 <- initial # move on to the next simulation 
-        event_time[i] <- j # hitting time
-        event_status[i] <- 1 # dead 
-        break
-      }
-    }
-    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
-  }
-  return(values)
-}
 
 ## Arithmetic Brownian Motion (with drift and absorbing barrier) 
 my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L){ # same as above, except now we have mu for drift 
@@ -188,8 +147,7 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
   #my_bm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, L = 0.95)
 }
 
