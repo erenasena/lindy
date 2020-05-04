@@ -231,3 +231,18 @@ wei <- rweibull(n = 1000, shape = 1, scale = 1)
 fit_3 <- bshazard(Surv(wei) ~ 1)
 plot(x = fit_3$time, fit_3$hazard, ylim = c(min(fit_3$haz), max(fit_3$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
+
+### Creating survival and hazard functions 
+#ecdf 
+#density
+#surv = 1-ecdf 
+#hazard[i] = density/surv 
+
+set.seed(1234)
+data <- rexp(n = 10000000, rate = 1) # generate data from the exponential distribution 
+y <- median(y)
+f <- density(data)
+F <- ecdf(data)
+F <- integrate(F, 0, y)
+S <- 1-F$value
+h <- f/S
