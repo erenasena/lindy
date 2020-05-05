@@ -147,20 +147,20 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
-  #my_bm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, L = 0.95)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
-v <- values(x = res, nsim = 1000, n = 10000) # indexing the BM values 
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
-t <- times(x = res, nsim = 1000, n = 10000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 1000, n = 10000)
+e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
@@ -175,7 +175,7 @@ hist(m_times) # Histogram of hitting times
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
-hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 10000), ylim = c(min(fit$haz), max(fit$haz)))
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(fit$haz), max(fit$haz)))
 
 ### Hazard function trials
 
@@ -211,38 +211,23 @@ plot(wvalues, type = 'l')
 library(bshazard)
 
 # Pareto: should be decreasing and it is
-set.seed(1)
-prt <- VGAM::rpareto(n = 1000, shape = 1.5, scale = 1)
+set.seed(1234)
+prt <- VGAM::rpareto(n = 1000, shape = 2, scale = 1)
 fit_1 <- bshazard(Surv(prt) ~ 1)
 plot(x = fit_1$time, y = fit_1$hazard, ylim =c(min(fit_1$haz), max(fit_1$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
 
 # Exponential: should be constant but it is not
-set.seed(1)
-exps <- rexp(n = 1000, 1)
+set.seed(1234)
+exps <- rexp(n = 100, 1)
 fit_2 <- bshazard(Surv(exps) ~ 1)
 plot(x = fit_2$time, y = fit_2$hazard, ylim = c(min(fit_2$haz), max(fit_2$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
 
-# Weibull: should be decreasing for shape < 1, constant for shape = 1, increasing for shape = 1
+# Weibull: should be decreasing for shape < 1, constant for shape = 1, increasing for shape > 1
 # except for constant hazard, it's all good 
-set.seed(1)
-wei <- rweibull(n = 1000, shape = 1, scale = 1)
+set.seed(1234)
+wei <- rweibull(n = 1000, shape = 4, scale = 1)
 fit_3 <- bshazard(Surv(wei) ~ 1)
 plot(x = fit_3$time, fit_3$hazard, ylim = c(min(fit_3$haz), max(fit_3$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
-
-### Creating survival and hazard functions 
-#ecdf 
-#density
-#surv = 1-ecdf 
-#hazard[i] = density/surv 
-
-set.seed(1234)
-data <- rexp(n = 10000000, rate = 1) # generate data from the exponential distribution 
-y <- median(y)
-f <- density(data)
-F <- ecdf(data)
-F <- integrate(F, 0, y)
-S <- 1-F$value
-h <- f/S
