@@ -146,8 +146,8 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90)
 }
 
 set.seed(1)
@@ -165,8 +165,8 @@ e <- events(x = res, nsim = 1000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-#p <- bmplot(x = m_val, nsim = 1000, n = 1000, L = 0.95, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
-#title = "Brownian motion with an absorbing barrier")
+#p <- bmplot(x = m_val, nsim = 1000, n = 1000, L = 90, ylim = c(87.5, 100), # Define the range of the y-axis  
+            #title = "Brownian motion with an absorbing barrier")
 #print(p)
 
 # Histogram of hitting times
