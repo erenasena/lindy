@@ -103,7 +103,6 @@ bmplot <- function(x, nsim, n, L, ylim, title){ # x is the matrix output of the 
   return(p)
 }
 
-
 ### Simulations
 RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
 detectCores() # tells you the number of cores your computer can use for the simulations 
@@ -148,19 +147,21 @@ events <- function(x, nsim, n){
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
   #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = 0, sigma = 1, L = 0.95)
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
+
+v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+
+t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 1000)
+e <- events(x = res, nsim = 1000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
@@ -169,8 +170,7 @@ df_event <- e[[2]]
 #print(p)
 
 # Histogram of hitting times
-hist(m_times, breaks = c(seq(from = 0, to = 1010, by = 10)), xlim = c(0, 2000))
-
+hist(m_times, breaks = c(seq(from = 0, to = 1010, by = 10)), xlim = c(0, 1000))
 
 ### Getting the hazard functions 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
