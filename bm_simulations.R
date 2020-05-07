@@ -147,8 +147,8 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0)
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95) 
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = 0, sigma = 1, L = 0.95)
 }
 
 set.seed(1)
@@ -168,8 +168,9 @@ df_event <- e[[2]]
 #title = "Brownian motion with an absorbing barrier")
 #print(p)
 
-hist(m_times) # Histogram of hitting times 
-#max(m_times)
+# Histogram of hitting times
+hist(m_times, breaks = c(seq(from = 0, to = 1010, by = 10)), xlim = c(0, 2000))
+
 
 ### Getting the hazard functions 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
