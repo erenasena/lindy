@@ -35,8 +35,9 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # same as above, except
       if(X[i,j] > L & X[i,j] <= R & j < ncol(X)){ 
         X0 <- X[i,j] 
         
-      } else if(X[i,j] > L & X[i,j] > R & j < ncol(X)){ 
-        X[i,j] <- X0
+      } else if(X[i,j] > L & X[i,j] > R & j < ncol(X)){ #HERE!
+        X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
+        X0 <- X[i, j]
         
       } else if(j == ncol(X)){
         X0 <- initial 
@@ -155,15 +156,17 @@ events <- function(x, nsim, n){
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
   #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 99.9, R = 100.2)
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 10, X0 = 100, mu = -1, sigma = 1, L = 99.9, R = 100.1)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:5, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 5, n = 10) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
+
+which(m_val > 100.1)
 
 t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
