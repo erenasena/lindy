@@ -16,7 +16,7 @@ library(dplyr)
 ### The BM functions 
 
 ## Arithmetic Brownian Motion (with drift and absorbing barrier) 
-my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L){ # same as above, except now we have mu for drift 
+my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # same as above, except now we have mu for drift 
   # sigma is the diffusion coefficient / volatility 
   # also added a t0 term, which is just 0 in practice
   
@@ -31,12 +31,18 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L){ # same as above, except no
   for(i in 1:nrow(X)){
     for(j in 2:length(time)){
       X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1) 
-      if(X[i,j] > L & j < ncol(X)){ 
+      
+      if(X[i,j] > L & X[i,j] <= R & j < ncol(X)){ 
         X0 <- X[i,j] 
-      } else if(X[i,j] > L & j == ncol(X)){ 
+        
+      } else if(X[i,j] > L & X[i,j] > R & j < ncol(X)){ 
+        X[i,j] <- X0
+        
+      } else if(j == ncol(X)){
         X0 <- initial 
         event_time[i] <- ncol(X) 
-        event_status[i] <- 0 # censored, did not die until the last point 
+        event_status[i] <- 0 # censored, did not die until the last point
+        
       } else if(X[i,j] <= L){ 
         X0 <- initial 
         event_time[i] <- j 
@@ -84,7 +90,7 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L){
 }
 
 ### Visualizations
-bmplot <- function(x, nsim, n, L, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
+bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
   rownames(x) <- paste("sim", seq(nsim), sep = "") # the number of simulations / rows
   colnames(x) <- paste("time", seq(0:n), sep = "") # the number of time points - 0:100 at the moment / columns 
   dat <- as.data.frame(x) # creating the data frame for ggplot 
@@ -99,7 +105,9 @@ bmplot <- function(x, nsim, n, L, ylim, title){ # x is the matrix output of the 
           axis.title.y = element_text(angle = 0, size = 11, margin = margin(t = 0, r = 10, b = 0, l = 0)), 
           axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
     geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
-    ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + geom_hline(yintercept = L, color = "orange", size = 0.3)
+    ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + 
+    geom_hline(yintercept = c(L, R), color = "orange", size = 0.3) + 
+    #geom_hline(yintercept = R, color = "green", size = 0.3) +
   return(p)
 }
 
@@ -146,26 +154,26 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 97.5)
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90) 
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 99.9, R = 100.2)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 1000, n = 1000)
+e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-#p <- bmplot(x = m_val, nsim = 1000, n = 1000, L = 90, ylim = c(87.5, 100), # Define the range of the y-axis  
+#p <- bmplot(x = m_val, nsim = 10000, n = 1000, L = 0.9999, R = 1.15, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
             #title = "Brownian motion with an absorbing barrier")
 #print(p)
 
@@ -177,7 +185,7 @@ surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim
 surv_object <- Surv(time = m_times, event = m_event) 
 fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(fit$haz), max(fit$haz)))
-
+range(fit$hazard)
 ### Hazard function trials
 
 # The hazard function of Pareto
