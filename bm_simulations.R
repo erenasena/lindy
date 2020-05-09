@@ -75,13 +75,13 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
     for(j in 2:length(time)){
       X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
       
-      while(X[i,j] > R){
-        X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
+      if(X[i,j] > R){
+        X[i,j] <- R
+        X0 <- R
         
-        if(X[i,j] <= R) {
+        } else if(X[i,j] <= R) {
           X[i,j] <- X[i,j]
-        }
-      }
+          }
       
       if(X[i,j] > L & j < ncol(X)){ 
         X0 <- X[i,j] 
@@ -103,6 +103,7 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
   }
   return(values)
 }
+
 
 
 ### Visualizations
@@ -170,26 +171,26 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95, R = 5) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 5, X0 = 0, mu = 0, sigma = 1, L = -9999, R = 1)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 105) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10, X0 = 0, mu = 0, sigma = 1, L = -9999, R = 1)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 1000, n = 1000)
+e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-p <- bmplot(x = m_val, nsim = 1000, n = 1000, L = 0.95, R = 5, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+p <- bmplot(x = m_val, nsim = 10000, n = 1000, L = 90, R = 105, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
             title = "Brownian motion with an absorbing barrier")
 print(p)
 
