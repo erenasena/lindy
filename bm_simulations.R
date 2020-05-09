@@ -15,50 +15,52 @@ library(dplyr)
 
 ### The BM functions 
 
-## Arithmetic Brownian Motion (with drift and absorbing barrier) 
-my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # same as above, except now we have mu for drift 
-  # sigma is the diffusion coefficient / volatility 
-  # also added a t0 term, which is just 0 in practice
+## Arithmetic Brownian Motion (with drift, an absorbing barrier, and a reflecting barrier) 
+my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   
   dt <- t/n 
-  time <- seq(from = t0, to = t, by = dt) # a time vector that determines the number of columns, with rows being the simulated sample paths  
+  time <- seq(from = t0, to = t, by = dt)   
   initial <- X0  
   X <- matrix(nrow = nsim, ncol = length(time)) 
   X[1:nsim, 1] <- X0
-  event_time <- numeric(length = nsim) # I changed the hitting times to event time and 
-  event_status <- numeric(length = nsim) # added an event status indicating if failure happened or not
+  event_time <- numeric(length = nsim) 
+  event_status <- numeric(length = nsim) 
   
   for(i in 1:nrow(X)){
     for(j in 2:length(time)){
-      X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1) 
+      X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
       
-      if(X[i,j] > L & X[i,j] <= R & j < ncol(X)){ 
+      while(X[i,j] > R){ # simulate data as long as it's above the reflecting barrier 
+        X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
+        
+        if(X[i,j] <= R) { # if we are below or equal, the value stays the same
+        X[i,j] <- X[i,j]
+        }
+      }
+      
+      if(X[i,j] > L & j < ncol(X)){ 
         X0 <- X[i,j] 
         
-      } else if(X[i,j] > L & X[i,j] > R & j < ncol(X)){ #HERE!
-        X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
-        X0 <- X[i, j]
-        
-      } else if(j == ncol(X)){
+        } else if(X[i,j] > L & j == ncol(X)){
         X0 <- initial 
         event_time[i] <- ncol(X) 
-        event_status[i] <- 0 # censored, did not die until the last point
+        event_status[i] <- 0 
         
-      } else if(X[i,j] <= L){ 
+        } else if(X[i,j] <= L){ 
         X0 <- initial 
         event_time[i] <- j 
-        event_status[i] <- 1 # hit the boundary, dead 
+        event_status[i] <- 1
         break
       }
     }
     values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
   }
-  return(values)
+    return(values)
 }
 
+
 ## Geometric Brownian Motion (with absorbing barrier)
-# The only difference between this and the ABM function is the formula. The variables are the same. 
-my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L){ 
+my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   dt <- t/n 
   sig2 <- sigma^2 
   time <- seq(from = t0, to = t, by = dt)  
@@ -72,23 +74,36 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L){
   for(i in 1:nrow(X)){
     for(j in 2:length(time)){
       X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
+      
+      while(X[i,j] > R){
+        X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
+        
+        if(X[i,j] <= R) {
+          X[i,j] <- X[i,j]
+        }
+      }
+      
       if(X[i,j] > L & j < ncol(X)){ 
-        X0 <- X[i,j]  
-      } else if(X[i,j] > L & j == ncol(X)){ 
-        X0 <- initial  
+        X0 <- X[i,j] 
+        
+      } else if(X[i,j] > L & j == ncol(X)){
+        X0 <- initial 
         event_time[i] <- ncol(X) 
-        event_status[i] <- 0
+        event_status[i] <- 0 
+        
       } else if(X[i,j] <= L){ 
-        X0 <- initial  
-        event_time[i] <- j
-        event_status[i] <- 1
+        X0 <- initial 
+        event_time[i] <- j 
+        event_status[i] <- 1 
         break
+        
       }
     }
     values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
   }
   return(values)
 }
+
 
 ### Visualizations
 bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
@@ -107,8 +122,8 @@ bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of t
           axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
     geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
     ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + 
-    geom_hline(yintercept = c(L, R), color = "orange", size = 0.3) + 
-    #geom_hline(yintercept = R, color = "green", size = 0.3) +
+    geom_hline(yintercept = L, color = "orange", size = 0.5) +
+    geom_hline(yintercept = R, color = "green", size = 0.5)
   return(p)
 }
 
@@ -155,30 +170,28 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 10, X0 = 100, mu = -1, sigma = 1, L = 99.9, R = 100.1)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.95, R = 5) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 5, X0 = 0, mu = 0, sigma = 1, L = -9999, R = 1)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:5, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 5, n = 10) # indexing the BM values 
+v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-which(m_val > 100.1)
-
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 1000)
+e <- events(x = res, nsim = 1000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-#p <- bmplot(x = m_val, nsim = 10000, n = 1000, L = 0.9999, R = 1.15, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
-            #title = "Brownian motion with an absorbing barrier")
-#print(p)
+p <- bmplot(x = m_val, nsim = 1000, n = 1000, L = 0.95, R = 5, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+            title = "Brownian motion with an absorbing barrier")
+print(p)
 
 # Histogram of hitting times
 hist(m_times, breaks = c(seq(from = 0, to = 1010, by = 10)), xlim = c(0, 1000))
@@ -188,8 +201,10 @@ surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim
 surv_object <- Surv(time = m_times, event = m_event) 
 fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(fit$haz), max(fit$haz)))
-range(fit$hazard)
+hist(fit$hazard)
+
 ### Hazard function trials
+
 
 # The hazard function of Pareto
 library(VGAM)
@@ -243,3 +258,23 @@ wei <- rweibull(n = 1000, shape = 4, scale = 1)
 fit_3 <- bshazard(Surv(wei) ~ 1)
 plot(x = fit_3$time, fit_3$hazard, ylim = c(min(fit_3$haz), max(fit_3$haz)), 
      xlab = "Time", ylab = "Hazard", type = 'l')
+
+
+
+x <- seq(from = 0.1, to = 0.5, by = 0.1)
+
+f <- function(y){
+  for(i in 1:length(y)){
+    y[i] <- rnorm(n = 1, mean = 0, sd =1)
+    if(y[i] <= 0.3){
+      y[i] <- y[i]
+      } else {
+      Recall(y = x)
+    }
+  }
+  return(y)
+}
+f(y = x)
+
+
+
