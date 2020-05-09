@@ -15,7 +15,7 @@ library(dplyr)
 
 ### The BM functions 
 
-## Arithmetic Brownian Motion (with drift, an absorbing barrier, and a reflecting barrier) 
+## Arithmetic Brownian Motion (resamples until the value is below the boundary)  
 my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   
   dt <- t/n 
@@ -59,7 +59,7 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
 }
 
 
-## Geometric Brownian Motion (with absorbing barrier)
+## Geometric Brownian Motion (the new value is the barrier value until it is below)
 my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   dt <- t/n 
   sig2 <- sigma^2 
@@ -75,13 +75,56 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
     for(j in 2:length(time)){
       X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
       
-      if(X[i,j] > R){
+      if(X[i,j] > R){ # if above the barrier, the new value is the barrier level 
         X[i,j] <- R
-        X0 <- R
-        
-        } else if(X[i,j] <= R) {
+
+        } else if(X[i,j] <= R) { # otherwise it's the simulated value 
           X[i,j] <- X[i,j]
           }
+      
+      if(X[i,j] > L & j < ncol(X)){ 
+        X0 <- X[i,j] 
+        
+      } else if(X[i,j] > L & j == ncol(X)){
+        X0 <- initial 
+        event_time[i] <- ncol(X) 
+        event_status[i] <- 0 
+        
+      } else if(X[i,j] <= L){ 
+        X0 <- initial 
+        event_time[i] <- j 
+        event_status[i] <- 1 
+        break
+        
+      }
+    }
+    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+  }
+  return(values)
+}
+
+## Geometric Brownian Motion (reflects back; the new value is the previous value)
+my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
+  dt <- t/n 
+  sig2 <- sigma^2 
+  time <- seq(from = t0, to = t, by = dt)  
+  
+  initial <- X0  
+  X <- matrix(nrow = nsim, ncol = length(time)) 
+  X[1:nsim, 1] <- X0 
+  event_time <- numeric(length = nsim)
+  event_status <- numeric(length = nsim)
+  
+  for(i in 1:nrow(X)){
+    for(j in 2:length(time)){
+      X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
+      
+      if(X[i,j] > R){ # if above the barrier, the value does not change 
+        X[i,j] <- X[i,j-1]
+
+      } else if(X[i,j] <= R) { # otherwise it's the simulated value 
+        X[i,j] <- X[i,j]
+      }
       
       if(X[i,j] > L & j < ncol(X)){ 
         X0 <- X[i,j] 
@@ -171,7 +214,7 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 105) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 101) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 10, X0 = 0, mu = 0, sigma = 1, L = -9999, R = 1)
 }
 
