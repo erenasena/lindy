@@ -47,6 +47,7 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
         event_status[i] <- 0 
         
         } else if(X[i,j] <= L){ 
+        X[i,j] <- L
         X0 <- initial 
         event_time[i] <- j 
         event_status[i] <- 1
@@ -214,40 +215,59 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 101) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10, X0 = 0, mu = 0, sigma = 1, L = -9999, R = 1)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 104, X0 = 100, mu = -1, sigma = 1, L = 35, R = 100000000) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.65, R = 1.01)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:178, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 178, n = 104) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 178, n = 104) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 1000)
+e <- events(x = res, nsim = 178, n = 104)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-p <- bmplot(x = m_val, nsim = 10000, n = 1000, L = 90, R = 105, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+p <- bmplot(x = m_val, nsim = 178, n = 104, L = -100, R = -100, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
             title = "Brownian motion with an absorbing barrier")
 print(p)
 
 # Histogram of hitting times
-hist(m_times, breaks = c(seq(from = 0, to = 1010, by = 10)), xlim = c(0, 1000))
+hist(m_times, breaks = 100, xlim = c(0, 110), main = 'GBM with an absorbing barrier')
+legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
 ### Getting the hazard functions 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
-hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(fit$haz), max(fit$haz)))
-hist(fit$hazard)
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 110), ylim = c(min(fit$haz), max(fit$haz)))
+legend(x = "topright", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = 125'))
 
 ### Hazard function trials
+set.seed(1)
+exps <- rexp(n = 10000, rate = 0.00001)
+expsurv <- bshazard::bshazard(Surv(exps) ~ 1)
+plot(expsurv$time, expsurv$hazard, type = 'l', xlim = c(0, 10000), 
+                                                        ylim = c(min(expsurv$haz), max(expsurv$haz)))
+hist(exps)
+cums <- cumsum(expsurv$hazard)
+plot(expsurv$time, cums, type = 'l', xlim = c(0, 10000), ylim = c(min(cums), max(cums)))
+
+set.seed(1)
+pars <- VGAM::rpareto(n = 10000, scale = 1000, shape = 1.7)
+parsurv <- bshazard::bshazard(Surv(pars) ~ 1)
+plot(parsurv$time, parsurv$hazard, type = 'l', xlim = c(min(parsurv$time), max(parsurv$time)), 
+     ylim = c(min(parsurv$haz), max(parsurv$haz)))
+hist(pars)
+cums <- cumsum(parsurv$hazard)
+plot(parsurv$time, cums, type = 'l', xlim = c(0, 10000), ylim = c(min(cums), max(cums)))
+
 
 
 # The hazard function of Pareto
