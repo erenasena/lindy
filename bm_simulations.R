@@ -267,4 +267,3 @@ for(i in 1:length(con_surv)){
   con_surv[i] <- survs[i+1] / survs[i]
 }
 plot(x = 1:98, y = con_surv, type = 'l', xlab = "Time", ylab = "Conditional survival")
-
