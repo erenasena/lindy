@@ -243,11 +243,15 @@ df_event <- e[[2]]
 hist(m_times, breaks = 15, xlim = c(0, 110), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
-### Dynamic prediction 
+### Dynamic prediction
+
+## Survival curve and fitting the model 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
 surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
+
+## Conditional death with the package 
 con_death <- Fwindow(object = surv_fit, width = 1, variance = TRUE, conf.level = 0.95)
 con_plot <- plot(x = con_death$time, y = con_death$Fw, type = 'l', ylim = c(min(con_death$Fw), max(con_death$Fw)),
      xlab = "Time", ylab = "Conditional death")
@@ -256,7 +260,7 @@ fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 110), ylim = c(min(fit$haz), max(fit$haz)))
 
 
-
+## My conditional survival function with the formula 
 survs <- surv_fit$surv
 con_surv <- numeric(length = length(survs) - 1)
 for(i in 1:length(con_surv)){
