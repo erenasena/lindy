@@ -12,6 +12,7 @@ library(parallel)
 library(survminer)
 library(survival)
 library(dplyr)
+library(dynpred)
 
 ### The BM functions 
 
@@ -215,40 +216,51 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 100, X0 = 100, mu = -1, sigma = 1, L = 75, R = 100000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 100, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.65, R = 1.01)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:250, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 250, n = 100) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 100) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 250, n = 100) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 100) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 250, n = 100)
+e <- events(x = res, nsim = 10000, n = 100)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-p <- bmplot(x = m_val, nsim = 250, n = 100, L = 90, R = 0, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
-            title = "Brownian motion with an absorbing barrier")
-print(p)
+#p <- bmplot(x = m_val, nsim = 250, n = 100, L = 90, R = 0, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+            #title = "Brownian motion with an absorbing barrier")
+#print(p)
 
 # Histogram of hitting times
-hist(m_times, breaks = 100, xlim = c(0, 110), main = 'GBM with an absorbing barrier')
+hist(m_times, breaks = 15, xlim = c(0, 110), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
+### Dynamic prediction 
+surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
+surv_object <- Surv(time = m_times, event = m_event) 
+surv_fit <- survfit(surv_object ~ 1)
+surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
+con_death <- Fwindow(object = surv_fit, width = 1, variance = TRUE, conf.level = 0.95)
+con_plot <- plot(x = con_death$time, y = con_death$Fw, type = 'l', ylim = c(min(con_death$Fw), max(con_death$Fw)),
+     xlab = "Time", ylab = "Conditional death")
+
+fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 110), ylim = c(min(fit$haz), max(fit$haz)))
 
 
 
-
-
-
-
-
-
+survs <- surv_fit$surv
+con_surv <- numeric(length = length(survs) - 1)
+for(i in 1:length(con_surv)){
+  con_surv[i] <- survs[i+1] / survs[i]
+}
+plot(x = 1:98, y = con_surv, type = 'l', xlab = "Time", ylab = "Conditional survival")
 
