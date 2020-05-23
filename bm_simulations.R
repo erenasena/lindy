@@ -249,29 +249,10 @@ legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
-surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
-
-## Conditional death with the package 
-con_death <- Fwindow(object = surv_fit, width = 1, variance = T, conf.level = 0.95)
-deaths <- con_death$Fw # conditional deaths 
-con_plot <- plot(x = con_death$time, y = deaths, type = 'l', ylim = c(min(con_death$Fw), max(con_death$Fw)),
-     xlab = "Time", ylab = "Conditional death")
-
-fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data) # fit the hazard function 
-hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1010), ylim = c(min(fit$haz), max(fit$haz)))
-
-## My conditional survival function with the formula 
-con_surv <- function(x){
-  cons <- numeric(length = length(x) - 1)
-  for(i in 1:length(cons)){
-    cons[i] <- x[i+1] / x[i]
-  }
-  return(cons)
-}
-
-survs <- surv_fit$surv # survival probabilities 
-surv_prob <- con_surv(x = survs) # conditional survival probabilities 
-plot(x = 1:length(con), y = con, type = 'l', xlab = 'Time', ylab = 'Conditional survival')
+#surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
+haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+hazard <- haz_fit$hazard
+hazard_plot <- plot(haz_fit$time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
 ## A function that computes the difference between successive rates 
 diff <- function(x){
@@ -282,29 +263,24 @@ diff <- function(x){
   return(diff)
 }
 
-stat <- stationary_probs(x = hazard)
-plot(x = 1:length(stat), y = stat, type = 'l', xlab = 'Index', ylab = 'Difference')
-mean(stat)
-median(stat)
+diff_haz <- diff(x = hazard) # a vector of the differences between successive hazard rates 
+mean(diff_haz)
+median(diff_haz)
 
 ### Generate perfect data from the exponential, Pareto and Weibull distributions 
 set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
+pareto <- VGAM::rpareto(n = 1000, scale = 1, shape = 1.5)
 
 set.seed(1)
-exps <- rexp(n = 10000, rate = 1)
+exps <- rexp(n = 1000, rate = 1)
 
 set.seed(1)
 weibull <- rweibull(n = 1000, shape = 2)
 
-
-surv_object <- Surv(time = exps) 
-surv_fit <- survfit(surv_object ~ 1)
-survs <- surv_fit$surv
-con <- con_surv(x = survs)
-plot(x = 1:length(con), y = con, type = 'l', xlab = 'Time', ylab = 'Conditional survival')
-
-fit <- bshazard::bshazard(surv_object ~ 1)
-hazard <- fit$hazard
-hazard_plot <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 50), ylim = c(min(fit$haz), max(fit$haz)))
-
+new_surv_object <- Surv(time = exps) 
+new_surv_fit <- survfit(new_surv_object ~ 1)
+new_fit <- bshazard::bshazard(new_surv_object ~ 1)
+new_plot <- plot(new_fit$time, new_fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 50), ylim = c(min(new_fit$haz), max(new_fit$haz)))
+new_diff <- diff(x = new_fit$hazard)
+mean(new_diff)
+median(new_diff)
