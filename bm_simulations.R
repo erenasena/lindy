@@ -216,31 +216,31 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 100, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.65, R = 1.01)
 }
 
 set.seed(1)
 res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 100) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 100) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 100)
+e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-#p <- bmplot(x = m_val, nsim = 250, n = 100, L = 90, R = 0, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
+#p <- bmplot(x = m_val, nsim = 10000, n = 100, L = 90, R = 75, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
             #title = "Brownian motion with an absorbing barrier")
 #print(p)
 
 # Histogram of hitting times
-hist(m_times, breaks = 15, xlim = c(0, 110), main = 'GBM with an absorbing barrier')
+hist(m_times, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
 ### Dynamic prediction
@@ -252,18 +252,59 @@ surv_fit <- survfit(surv_object ~ 1)
 surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
 
 ## Conditional death with the package 
-con_death <- Fwindow(object = surv_fit, width = 1, variance = TRUE, conf.level = 0.95)
-con_plot <- plot(x = con_death$time, y = con_death$Fw, type = 'l', ylim = c(min(con_death$Fw), max(con_death$Fw)),
+con_death <- Fwindow(object = surv_fit, width = 1, variance = T, conf.level = 0.95)
+deaths <- con_death$Fw # conditional deaths 
+con_plot <- plot(x = con_death$time, y = deaths, type = 'l', ylim = c(min(con_death$Fw), max(con_death$Fw)),
      xlab = "Time", ylab = "Conditional death")
 
-fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
-hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 110), ylim = c(min(fit$haz), max(fit$haz)))
-
+fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data) # fit the hazard function 
+hazard <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1010), ylim = c(min(fit$haz), max(fit$haz)))
 
 ## My conditional survival function with the formula 
-survs <- surv_fit$surv
-con_surv <- numeric(length = length(survs) - 1)
-for(i in 1:length(con_surv)){
-  con_surv[i] <- survs[i+1] / survs[i]
+con_surv <- function(x){
+  cons <- numeric(length = length(x) - 1)
+  for(i in 1:length(cons)){
+    cons[i] <- x[i+1] / x[i]
+  }
+  return(cons)
 }
-plot(x = 1:98, y = con_surv, type = 'l', xlab = "Time", ylab = "Conditional survival")
+
+survs <- surv_fit$surv # survival probabilities 
+surv_prob <- con_surv(x = survs) # conditional survival probabilities 
+plot(x = 1:length(con), y = con, type = 'l', xlab = 'Time', ylab = 'Conditional survival')
+
+## A function that computes the difference between successive rates 
+diff <- function(x){
+  diff <- numeric(length = length(x) - 1)
+  for(i in 2:length(x)){
+    diff[i-1] <- x[i] - x[i-1]
+  }
+  return(diff)
+}
+
+stat <- stationary_probs(x = hazard)
+plot(x = 1:length(stat), y = stat, type = 'l', xlab = 'Index', ylab = 'Difference')
+mean(stat)
+median(stat)
+
+### Generate perfect data from the exponential, Pareto and Weibull distributions 
+set.seed(1)
+pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
+
+set.seed(1)
+exps <- rexp(n = 10000, rate = 1)
+
+set.seed(1)
+weibull <- rweibull(n = 1000, shape = 2)
+
+
+surv_object <- Surv(time = exps) 
+surv_fit <- survfit(surv_object ~ 1)
+survs <- surv_fit$surv
+con <- con_surv(x = survs)
+plot(x = 1:length(con), y = con, type = 'l', xlab = 'Time', ylab = 'Conditional survival')
+
+fit <- bshazard::bshazard(surv_object ~ 1)
+hazard <- fit$hazard
+hazard_plot <- plot(fit$time, fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 50), ylim = c(min(fit$haz), max(fit$haz)))
+
