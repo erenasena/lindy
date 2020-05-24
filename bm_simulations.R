@@ -278,7 +278,7 @@ weibull <- rweibull(n = 10000, shape = 0.9)
 exp_weibull <- function(t, lambda = 0.5, gamma = 1.5) lambda * gamma * t^(gamma - 1)
 
 ## Calculating the hazards 
-new_surv_object <- Surv(time = pareto) 
+new_surv_object <- Surv(time = exps) 
 new_surv_fit <- survfit(new_surv_object ~ 1)
 new_fit <- bshazard::bshazard(new_surv_object ~ 1)
 new_hazard <- new_fit$hazard
@@ -319,6 +319,8 @@ change <- function(x){ # if the hazard rate increased, we get a 1, if it decreas
 }
 
 changes <- change(x = new_hazard) # a vector of 1s and -1s 
+sum_plus <- sum(length(which(changes == 1))) # sum of the number of increases 
+sum_minus <- sum(length(which(changes == -1))) # sum of the number of decreases 
 
 reps <- function(x){
   rep_vals <- rle(x)$values # just the values (i.e., 1 and -1)
@@ -337,10 +339,12 @@ reps <- function(x){
 obs_rep <- reps(x = changes)
 
 ## Resampling for the repetitions 
-rep_dist <- replicate(10000, reps(change(x = sample(new_hazard, length(new_hazard), FALSE))))
+rep_dist <- replicate(10000, sum(length(which(change(x = sample(new_hazard, length(new_hazard), FALSE)) == 1))))
 hist(rep_dist, breaks = 100)  
-abline(v = obs_rep, col = 'red', lwd = 2)
-sum(dist > obs_rep) / 10000
+abline(v = sum_plus, col = 'red', lwd = 2)
+sum(rep_dist > sum_plus) / 10000
+
+sum(sum_minus, sum_plus)
 
 newhazards <- sample(new_hazard, length(new_hazard), FALSE)
 plot(new_fit$time, newhazards, type = 'l')
