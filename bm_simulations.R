@@ -243,9 +243,7 @@ df_event <- e[[2]]
 hist(m_times, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
-### Dynamic prediction
-
-## Survival curve and fitting the model 
+### Survival curve and fitting the model 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
@@ -264,23 +262,88 @@ diff <- function(x){
 }
 
 diff_haz <- diff(x = hazard) # a vector of the differences between successive hazard rates 
-mean(diff_haz)
+observed <- mean(diff_haz)
 median(diff_haz)
+plot(diff_haz, type = 'l')
 
 ### Generate perfect data from the exponential, Pareto and Weibull distributions 
 set.seed(1)
-pareto <- VGAM::rpareto(n = 1000, scale = 1, shape = 1.5)
+pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
 
 set.seed(1)
-exps <- rexp(n = 1000, rate = 1)
+exps <- rexp(n = 10000, rate = 0.0001)
 
 set.seed(1)
-weibull <- rweibull(n = 1000, shape = 2)
+weibull <- rweibull(n = 10000, shape = 0.9)
+exp_weibull <- function(t, lambda = 0.5, gamma = 1.5) lambda * gamma * t^(gamma - 1)
 
-new_surv_object <- Surv(time = exps) 
+## Calculating the hazards 
+new_surv_object <- Surv(time = pareto) 
 new_surv_fit <- survfit(new_surv_object ~ 1)
 new_fit <- bshazard::bshazard(new_surv_object ~ 1)
-new_plot <- plot(new_fit$time, new_fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 50), ylim = c(min(new_fit$haz), max(new_fit$haz)))
-new_diff <- diff(x = new_fit$hazard)
-mean(new_diff)
-median(new_diff)
+new_hazard <- new_fit$hazard
+new_plot <- plot(new_fit$time, new_fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 100), ylim = c(min(new_fit$haz), max(new_fit$haz)))
+new_diff <- diff(x = new_hazard)
+trial_observed <- mean(new_diff)
+
+## Resampling the mean difference 
+dist <- replicate(10000, mean(diff(x = sample(new_hazard, length(new_hazard), FALSE))))
+hist(dist, breaks = 100)  
+abline(v = trial_observed, col = 'red', lwd = 2) 
+
+## Hypothesis tests
+
+# One sided, the alternative is <
+sum(dist < trial_observed) / 10000 # one sided, alternative is smaller 
+
+# One sided, the alternative is > 
+sum(dist > trial_observed) / 10000 # one sided, alternative is larger 
+
+# Two tailed tests in different ways 
+(sum(dist < trial_observed) + sum(dist > abs(trial_observed))) / 10000 # two tailed for smaller 
+sum(abs(dist) > trial_observed) / 10000 # two tailed for larger 
+
+## A function to get the number of successive decreases
+change <- function(x){ # if the hazard rate increased, we get a 1, if it decreased, we get a -1 
+  change <- numeric(length(x) - 1)
+  for(i in 2:length(x)){
+    if(x[i] - x[i-1] > 0){
+      change[i-1] <- 1
+      } else if(x[i] - x[i-1] < 0){
+        change[i-1] <- -1
+      } else if(x[i] - x[i-1] == 0){
+        change[i-1] <- 0
+      }
+  }
+  return(change)
+}
+
+changes <- change(x = new_hazard) # a vector of 1s and -1s 
+
+reps <- function(x){
+  rep_vals <- rle(x)$values # just the values (i.e., 1 and -1)
+  rep_lengths <- rle(x)$lengths # how many times they are repeated
+  data <- data.frame('Values' = rep_vals, 'Frequency' = rep_lengths) # all in a nice form 
+  plus <- which(data$Values == 1) # indexing the values 
+  minus <- which(data$Values == -1)
+  inc <- sum(data$Frequency[plus]) # the total number of increases in succession 
+  dec <- sum(data$Frequency[minus]) # the total number of decreases in succession 
+  max_inc <- max(data$Frequency[plus]) # the number of first sucessions of 1 
+  max_dec <- max(data$Frequency[minus]) # the number of first sucessions of -1 
+  list = list('Data' = data, 'Decreases' = max_dec, 'Increases' = max_inc)
+  return(list)
+}
+
+obs_rep <- reps(x = changes)
+
+## Resampling for the repetitions 
+rep_dist <- replicate(10000, reps(change(x = sample(new_hazard, length(new_hazard), FALSE))))
+hist(rep_dist, breaks = 100)  
+abline(v = obs_rep, col = 'red', lwd = 2)
+sum(dist > obs_rep) / 10000
+
+newhazards <- sample(new_hazard, length(new_hazard), FALSE)
+plot(new_fit$time, newhazards, type = 'l')
+newchanges <- change(x = newhazards)
+newreps <- reps(x = newchanges)
+
