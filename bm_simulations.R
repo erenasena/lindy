@@ -60,14 +60,14 @@ reps <- function(x){ # the input is the output vector of the change function
 set.seed(1)
 pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
 
-set.seed(1234)
+set.seed(1)
 exps <- rexp(n = 10000, rate = 0.0001)
 
 set.seed(1)
 weibull <- rweibull(n = 10000, shape = 1.1)
 
 ## Calculating the hazards 
-survival_object <- Surv(time = weibull) 
+survival_object <- Surv(time = pareto) 
 survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
 hazard_time <- hazard_fit$time
@@ -80,18 +80,18 @@ new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard 
 # difference, and replicating this process 10,000 times to get a distribution of mean differences
 mean_diff <- mean(diff(x = hazard_rates))
 diff_dist <- replicate(10000, mean(diff(x = sample(hazard_rates, length(hazard_rates), FALSE))))
-hist(diff_dist, breaks = 100, xlim = c(min(diff_dist), mean_diff), xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
+hist(diff_dist, breaks = 100, xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
 abline(v = mean_diff, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
 
 # One sided, the alternative is <
-sum(dist < mean_diff) / 10000 
+sum(diff_dist < mean_diff) / 10000 
 
 # One sided, the alternative is > 
-sum(dist > mean_diff) / 10000
+sum(diff_dist > mean_diff) / 10000
 
 # Two tailed tests 
-(sum(dist < mean_diff) + sum(dist > abs(mean_diff))) / 10000 # two tailed for smaller 
-sum(abs(dist) > mean_diff) / 10000 # two tailed for larger 
+(sum(diff_dist < mean_diff) + sum(diff_dist > abs(mean_diff))) / 10000 # two tailed for smaller 
+sum(abs(diff_dist) > mean_diff) / 10000 # two tailed for larger 
 
 ## Hypothesis test on the total number of decreases 
 
