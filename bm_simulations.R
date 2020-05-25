@@ -5,14 +5,131 @@
 #install.packages("survival")
 #install.packages("dplyr")
 
-# The necessary libraries 
-library(ggplot2)
-library(reshape2)
+# The necessary libraries
 library(parallel)
 library(survminer)
 library(survival)
 library(dplyr)
 library(dynpred)
+
+### The functions that prepare the data for the hypothesis tests, depending on what is tested
+
+## Computes the differences between successive hazard rates to get the mean difference
+diff <- function(x){ # the input is a vector of hazard rates 
+  diff <- numeric(length = length(x) - 1)
+  for(i in 2:length(x)){
+    diff[i-1] <- x[i] - x[i-1]
+  }
+  return(diff)
+}
+
+## Tracks the changes in the hazard rates in terms of increases and decreases 
+## Can be used both to get the total number of increases / decreases or successive increases / decreases
+change <- function(x){ # the input is a vector of hazard rates
+                       # returns a vector of 1s and -1s 
+                  
+  change <- numeric(length(x) - 1)
+  for(i in 2:length(x)){
+    if(x[i] - x[i-1] > 0){
+      change[i-1] <- 1 # if the hazard rate increased, we get a 1  
+    } else if(x[i] - x[i-1] < 0){
+      change[i-1] <- -1 # if it decreased, we get a -1
+    } else if(x[i] - x[i-1] == 0){
+      change[i-1] <- 0 # if it remained the same, which it never does, we get a 0 
+    }
+  }
+  return(change)
+}
+
+## If the goal is to get the successive increases / decreases, this function will do it
+reps <- function(x){ # the input is the output vector of the change function  
+  rep_vals <- rle(x)$values # just the values (i.e., 1 and -1)
+  rep_lengths <- rle(x)$lengths # how many times they are repeated
+  data <- data.frame('Values' = rep_vals, 'Frequency' = rep_lengths) # all in a nice form 
+  plus <- which(data$Values == 1) # indexing the values 
+  minus <- which(data$Values == -1)
+  inc <- sum(data$Frequency[plus]) # the total number of successive increases 
+  dec <- sum(data$Frequency[minus]) # the total number of successive decreases 
+  max_inc <- max(data$Frequency[plus]) # the maximum number of successive increases
+  max_dec <- max(data$Frequency[minus]) # the maximum number of successive decreases 
+  list = list('Data' = data, 'Decreases' = max_dec, 'Increases' = max_inc)
+  return(list$Decreases)
+}
+
+### Generate trial data from the exponential, Pareto and Weibull distributions 
+set.seed(1)
+pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
+
+set.seed(1234)
+exps <- rexp(n = 10000, rate = 0.0001)
+
+set.seed(1)
+weibull <- rweibull(n = 10000, shape = 1.1)
+
+## Calculating the hazards 
+survival_object <- Surv(time = weibull) 
+survival_fit <- survfit(survival_object ~ 1)
+hazard_fit <- bshazard::bshazard(survival_object ~ 1)
+hazard_time <- hazard_fit$time
+hazard_rates <- hazard_fit$hazard
+new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 100), ylim = c(min(hazard_rates), max(hazard_rates)))
+
+## Hypothesis test on the mean difference 
+
+# Resampling the hazard rates, getting their means, getting their differences, finding the mean 
+# difference, and replicating this process 10,000 times to get a distribution of mean differences
+mean_diff <- mean(diff(x = hazard_rates))
+diff_dist <- replicate(10000, mean(diff(x = sample(hazard_rates, length(hazard_rates), FALSE))))
+hist(diff_dist, breaks = 100, xlim = c(min(diff_dist), mean_diff), xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
+abline(v = mean_diff, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
+
+# One sided, the alternative is <
+sum(dist < mean_diff) / 10000 
+
+# One sided, the alternative is > 
+sum(dist > mean_diff) / 10000
+
+# Two tailed tests 
+(sum(dist < mean_diff) + sum(dist > abs(mean_diff))) / 10000 # two tailed for smaller 
+sum(abs(dist) > mean_diff) / 10000 # two tailed for larger 
+
+## Hypothesis test on the total number of decreases 
+
+# Resampling for the sums 
+sum_minus <- sum(change(hazard_rates) == -1) # the observed total number of decreases
+sum_dist <- replicate(10000, sum(change(x = sample(hazard_rates, length(hazard_rates), FALSE)) == -1)) 
+hist(sum_dist, breaks = 100, xlab = 'Total number of decreases')  
+abline(v = sum_minus, col = 'red', lwd = 2)
+
+# One sided, the proportion of total decreases larger than the observed sum 
+sum(sum_dist > sum_minus) / 10000
+
+## Hypothesis test on the difference between the total number of increases and decreases 
+
+# Resampling 
+RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
+detectCores() # tells you the number of cores your computer can use for the simulations 
+
+sum_diff <- sum(change(hazard_rates) == 1) - sum(change(hazard_rates) == -1) # the observed difference
+
+sum_diff_fun <- function(x){
+  resampled <- sample(hazard_rates, length(hazard_rates), FALSE)
+  changes <- change(x = resampled)
+  plus <- sum(changes == 1)
+  minus <- sum(changes == -1)
+  return(plus - minus)
+}
+
+sum_diff_dist <- mclapply(1:10000, sum_diff_fun, mc.cores = 8, mc.set.seed = TRUE)
+sum_diff_dist <- unlist(sum_diff_dist)
+hist(sum_diff_dist, breaks = 500, xlab = 'Increases - decreases')  
+abline(v = sum_diff, col = 'red', lwd = 2)
+
+## Hypothesis test on the maximum number of successive increases or decreases 
+observed_max <- reps(change(hazard_rates))
+max_sucs_dist <- replicate(10000, reps(change(x = sample(hazard_rates, length(hazard_rates)))))
+hist(max_sucs_dist, breaks = 100, xlab = 'Max number of successive decreases')  
+abline(v = observed_max, col = 'red', lwd = 2)
 
 ### The BM functions 
 
@@ -105,74 +222,6 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
   return(values)
 }
 
-## Geometric Brownian Motion (reflects back; the new value is the previous value)
-my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
-  dt <- t/n 
-  sig2 <- sigma^2 
-  time <- seq(from = t0, to = t, by = dt)  
-  
-  initial <- X0  
-  X <- matrix(nrow = nsim, ncol = length(time)) 
-  X[1:nsim, 1] <- X0 
-  event_time <- numeric(length = nsim)
-  event_status <- numeric(length = nsim)
-  
-  for(i in 1:nrow(X)){
-    for(j in 2:length(time)){
-      X[i,j] <- X0 * exp(((mu - 0.5 * sig2) * dt) + (sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1))) # the formula for the next value of BM
-      
-      if(X[i,j] > R){ # if above the barrier, the value does not change 
-        X[i,j] <- X[i,j-1]
-
-      } else if(X[i,j] <= R) { # otherwise it's the simulated value 
-        X[i,j] <- X[i,j]
-      }
-      
-      if(X[i,j] > L & j < ncol(X)){ 
-        X0 <- X[i,j] 
-        
-      } else if(X[i,j] > L & j == ncol(X)){
-        X0 <- initial 
-        event_time[i] <- ncol(X) 
-        event_status[i] <- 0 
-        
-      } else if(X[i,j] <= L){ 
-        X0 <- initial 
-        event_time[i] <- j 
-        event_status[i] <- 1 
-        break
-        
-      }
-    }
-    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
-  }
-  return(values)
-}
-
-
-
-### Visualizations
-bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
-  rownames(x) <- paste("sim", seq(nsim), sep = "") # the number of simulations / rows
-  colnames(x) <- paste("time", seq(0:n), sep = "") # the number of time points - 0:100 at the moment / columns 
-  dat <- as.data.frame(x) # creating the data frame for ggplot 
-  dat$sim <- rownames(dat)
-  mdat <- melt(dat, id.vars = "sim")
-  mdat$time <- as.numeric(gsub("time", "", mdat$variable))
-  
-  p <- ggplot(data = mdat, mapping = aes(x = time, y = value, group = sim)) +
-    theme_bw() +
-    theme(panel.grid = element_blank(), 
-          plot.title = element_text(hjust = 0.5),
-          axis.title.y = element_text(angle = 0, size = 11, margin = margin(t = 0, r = 10, b = 0, l = 0)), 
-          axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
-    geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
-    ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + 
-    geom_hline(yintercept = L, color = "orange", size = 0.5) +
-    geom_hline(yintercept = R, color = "green", size = 0.5)
-  return(p)
-}
-
 ### Simulations
 RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
 detectCores() # tells you the number of cores your computer can use for the simulations 
@@ -235,15 +284,11 @@ e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
-#p <- bmplot(x = m_val, nsim = 10000, n = 100, L = 90, R = 75, ylim = c(min(m_val), max(m_val)), # Define the range of the y-axis  
-            #title = "Brownian motion with an absorbing barrier")
-#print(p)
-
 # Histogram of hitting times
 hist(m_times, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
-### Survival curve and fitting the model 
+### Survival curves and fitting the model 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
@@ -251,103 +296,3 @@ surv_fit <- survfit(surv_object ~ 1)
 haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 hazard <- haz_fit$hazard
 hazard_plot <- plot(haz_fit$time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
-
-## A function that computes the difference between successive rates 
-diff <- function(x){
-  diff <- numeric(length = length(x) - 1)
-  for(i in 2:length(x)){
-    diff[i-1] <- x[i] - x[i-1]
-  }
-  return(diff)
-}
-
-diff_haz <- diff(x = hazard) # a vector of the differences between successive hazard rates 
-observed <- mean(diff_haz)
-median(diff_haz)
-plot(diff_haz, type = 'l')
-
-### Generate perfect data from the exponential, Pareto and Weibull distributions 
-set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
-
-set.seed(1)
-exps <- rexp(n = 10000, rate = 0.0001)
-
-set.seed(1)
-weibull <- rweibull(n = 10000, shape = 0.9)
-exp_weibull <- function(t, lambda = 0.5, gamma = 1.5) lambda * gamma * t^(gamma - 1)
-
-## Calculating the hazards 
-new_surv_object <- Surv(time = exps) 
-new_surv_fit <- survfit(new_surv_object ~ 1)
-new_fit <- bshazard::bshazard(new_surv_object ~ 1)
-new_hazard <- new_fit$hazard
-new_plot <- plot(new_fit$time, new_fit$hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 100), ylim = c(min(new_fit$haz), max(new_fit$haz)))
-new_diff <- diff(x = new_hazard)
-trial_observed <- mean(new_diff)
-
-## Resampling the mean difference 
-dist <- replicate(10000, mean(diff(x = sample(new_hazard, length(new_hazard), FALSE))))
-hist(dist, breaks = 100)  
-abline(v = trial_observed, col = 'red', lwd = 2) 
-
-## Hypothesis tests
-
-# One sided, the alternative is <
-sum(dist < trial_observed) / 10000 # one sided, alternative is smaller 
-
-# One sided, the alternative is > 
-sum(dist > trial_observed) / 10000 # one sided, alternative is larger 
-
-# Two tailed tests in different ways 
-(sum(dist < trial_observed) + sum(dist > abs(trial_observed))) / 10000 # two tailed for smaller 
-sum(abs(dist) > trial_observed) / 10000 # two tailed for larger 
-
-## A function to get the number of successive decreases
-change <- function(x){ # if the hazard rate increased, we get a 1, if it decreased, we get a -1 
-  change <- numeric(length(x) - 1)
-  for(i in 2:length(x)){
-    if(x[i] - x[i-1] > 0){
-      change[i-1] <- 1
-      } else if(x[i] - x[i-1] < 0){
-        change[i-1] <- -1
-      } else if(x[i] - x[i-1] == 0){
-        change[i-1] <- 0
-      }
-  }
-  return(change)
-}
-
-changes <- change(x = new_hazard) # a vector of 1s and -1s 
-sum_plus <- sum(length(which(changes == 1))) # sum of the number of increases 
-sum_minus <- sum(length(which(changes == -1))) # sum of the number of decreases 
-
-reps <- function(x){
-  rep_vals <- rle(x)$values # just the values (i.e., 1 and -1)
-  rep_lengths <- rle(x)$lengths # how many times they are repeated
-  data <- data.frame('Values' = rep_vals, 'Frequency' = rep_lengths) # all in a nice form 
-  plus <- which(data$Values == 1) # indexing the values 
-  minus <- which(data$Values == -1)
-  inc <- sum(data$Frequency[plus]) # the total number of increases in succession 
-  dec <- sum(data$Frequency[minus]) # the total number of decreases in succession 
-  max_inc <- max(data$Frequency[plus]) # the number of first sucessions of 1 
-  max_dec <- max(data$Frequency[minus]) # the number of first sucessions of -1 
-  list = list('Data' = data, 'Decreases' = max_dec, 'Increases' = max_inc)
-  return(list)
-}
-
-obs_rep <- reps(x = changes)
-
-## Resampling for the repetitions 
-rep_dist <- replicate(10000, sum(length(which(change(x = sample(new_hazard, length(new_hazard), FALSE)) == 1))))
-hist(rep_dist, breaks = 100)  
-abline(v = sum_plus, col = 'red', lwd = 2)
-sum(rep_dist > sum_plus) / 10000
-
-sum(sum_minus, sum_plus)
-
-newhazards <- sample(new_hazard, length(new_hazard), FALSE)
-plot(new_fit$time, newhazards, type = 'l')
-newchanges <- change(x = newhazards)
-newreps <- reps(x = newchanges)
-
