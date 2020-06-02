@@ -12,50 +12,6 @@ library(survival)
 library(dplyr)
 library(dynpred)
 
-### The functions that prepare the data for the hypothesis tests, depending on what is tested
-
-## Computes the differences between successive hazard rates to get the mean difference
-diff <- function(x){ # the input is a vector of hazard rates 
-  diff <- numeric(length = length(x) - 1)
-  for(i in 2:length(x)){
-    diff[i-1] <- x[i] - x[i-1]
-  }
-  return(diff)
-}
-
-## Tracks the changes in the hazard rates in terms of increases and decreases 
-## Can be used both to get the total number of increases / decreases or successive increases / decreases
-change <- function(x){ # the input is a vector of hazard rates
-                       # returns a vector of 1s and -1s 
-                  
-  change <- numeric(length(x) - 1)
-  for(i in 2:length(x)){
-    if(x[i] - x[i-1] > 0){
-      change[i-1] <- 1 # if the hazard rate increased, we get a 1  
-    } else if(x[i] - x[i-1] < 0){
-      change[i-1] <- -1 # if it decreased, we get a -1
-    } else if(x[i] - x[i-1] == 0){
-      change[i-1] <- 0 # if it remained the same, which it never does, we get a 0 
-    }
-  }
-  return(change)
-}
-
-## If the goal is to get the successive increases / decreases, this function will do it
-reps <- function(x){ # the input is the output vector of the change function  
-  rep_vals <- rle(x)$values # just the values (i.e., 1 and -1)
-  rep_lengths <- rle(x)$lengths # how many times they are repeated
-  data <- data.frame('Values' = rep_vals, 'Frequency' = rep_lengths) # all in a nice form 
-  plus <- which(data$Values == 1) # indexing the values 
-  minus <- which(data$Values == -1)
-  inc <- sum(data$Frequency[plus]) # the total number of successive increases 
-  dec <- sum(data$Frequency[minus]) # the total number of successive decreases 
-  max_inc <- max(data$Frequency[plus]) # the maximum number of successive increases
-  max_dec <- max(data$Frequency[minus]) # the maximum number of successive decreases 
-  list = list('Data' = data, 'Decreases' = max_dec, 'Increases' = max_inc)
-  return(list$Decreases)
-}
-
 ### Generate trial data from the exponential, Pareto and Weibull distributions 
 set.seed(1)
 pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
@@ -72,64 +28,8 @@ survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
 hazard_time <- hazard_fit$time
 hazard_rates <- hazard_fit$hazard
-new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 100), ylim = c(min(hazard_rates), max(hazard_rates)))
-
-## Hypothesis test on the mean difference 
-
-# Resampling the hazard rates, getting their means, getting their differences, finding the mean 
-# difference, and replicating this process 10,000 times to get a distribution of mean differences
-mean_diff <- mean(diff(x = hazard_rates))
-diff_dist <- replicate(10000, mean(diff(x = sample(hazard_rates, length(hazard_rates), FALSE))))
-hist(diff_dist, breaks = 100, xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
-abline(v = mean_diff, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
-
-# One sided, the alternative is <
-sum(diff_dist < mean_diff) / 10000 
-
-# One sided, the alternative is > 
-sum(diff_dist > mean_diff) / 10000
-
-# Two tailed tests 
-(sum(diff_dist < mean_diff) + sum(diff_dist > abs(mean_diff))) / 10000 # two tailed for smaller 
-sum(abs(diff_dist) > mean_diff) / 10000 # two tailed for larger 
-
-## Hypothesis test on the total number of decreases 
-
-# Resampling for the sums 
-sum_minus <- sum(change(hazard_rates) == -1) # the observed total number of decreases
-sum_dist <- replicate(10000, sum(change(x = sample(hazard_rates, length(hazard_rates), FALSE)) == -1)) 
-hist(sum_dist, breaks = 100, xlab = 'Total number of decreases')  
-abline(v = sum_minus, col = 'red', lwd = 2)
-
-# One sided, the proportion of total decreases larger than the observed sum 
-sum(sum_dist > sum_minus) / 10000
-
-## Hypothesis test on the difference between the total number of increases and decreases 
-
-# Resampling 
-RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
-detectCores() # tells you the number of cores your computer can use for the simulations 
-
-sum_diff <- sum(change(hazard_rates) == 1) - sum(change(hazard_rates) == -1) # the observed difference
-
-sum_diff_fun <- function(x){
-  resampled <- sample(hazard_rates, length(hazard_rates), FALSE)
-  changes <- change(x = resampled)
-  plus <- sum(changes == 1)
-  minus <- sum(changes == -1)
-  return(plus - minus)
-}
-
-sum_diff_dist <- mclapply(1:10000, sum_diff_fun, mc.cores = 8, mc.set.seed = TRUE)
-sum_diff_dist <- unlist(sum_diff_dist)
-hist(sum_diff_dist, breaks = 500, xlab = 'Increases - decreases')  
-abline(v = sum_diff, col = 'red', lwd = 2)
-
-## Hypothesis test on the maximum number of successive increases or decreases 
-observed_max <- reps(change(hazard_rates))
-max_sucs_dist <- replicate(10000, reps(change(x = sample(hazard_rates, length(hazard_rates)))))
-hist(max_sucs_dist, breaks = 100, xlab = 'Max number of successive decreases')  
-abline(v = observed_max, col = 'red', lwd = 2)
+new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard Rate', 
+                 type = 'l', xlim = c(0, 100), ylim = c(min(hazard_rates), max(hazard_rates)))
 
 ### The BM functions 
 
@@ -265,8 +165,8 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 1, mu = -1, sigma = 1, L = 0.65, R = 1.01)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 110) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000)
 }
 
 set.seed(1)
@@ -295,4 +195,65 @@ surv_fit <- survfit(surv_object ~ 1)
 #surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
 haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 hazard <- haz_fit$hazard
-hazard_plot <- plot(haz_fit$time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
+time <- haz_fit$time
+hazard_plot <- plot(time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', 
+                    xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
+
+### Tests 
+
+## Rank-order correlation 
+corr <- cor.test(x = time, y = hazard, method = 'spearman')
+rho <- corr$estimate
+rhosq <- rho^2
+
+## Polynomial regression
+
+# Prepare the data 
+data <- data.frame(time = time, hazards = hazard)
+timelims <- range(time)
+time.grid <- seq(from = timelims[1], to = timelims[2])
+
+# The models 
+fit.1 <- lm(hazard ~ time, data = data)
+fit.2 <- lm(hazard ~ poly(time, 2), data = data)
+fit.3 <- lm(hazard ~ poly(time, 3), data = data)
+fit.4 <- lm(hazard ~ poly(time, 4), data = data)
+fit.5 <- lm(hazard ~ poly(time, 5), data = data)
+fit.6 <- lm(hazard ~ poly(time, 6), data = data)
+fit.7 <- lm(hazard ~ poly(time, 7), data = data)
+fit.8 <- lm(hazard ~ poly(time, 8), data = data)
+fit.9 <- lm(hazard ~ poly(time, 9), data = data)
+fit.10 <- lm(hazard ~ poly(time, 10), data = data)
+fit.20 <- lm(hazard ~ poly(time, 20), data = data)
+
+# Plotting the predictions
+preds <- predict(fit.10, newdata = list(time = time.grid), se = TRUE)
+se.bands <- cbind(preds$fit + 2 * preds$se.fit, preds$fit - 2 * preds$se.fit)
+
+plot(x = time, y = hazard, xlim = timelims, cex = .5, col = "darkgrey")
+lines(time.grid , preds$fit, lwd = 2, col = "blue")
+matlines(time.grid, se.bands , lwd = 1, col = "blue", lty = 3)
+
+# Comparing the models 
+anova(fit.1, fit.2, fit.3, fit.4, fit.5, fit.6, fit.7, fit.8, fit.9, fit.10, fit.20)
+
+## Regression splines
+library(splines)
+
+# Natural spline 
+fit <- lm(hazard ~ ns(time, df = 8), data = data)
+plot(x = time, y = hazard, xlim = timelims, cex = .5, col = "darkgrey")
+pred = predict(fit, newdata = list(time = time.grid), se = T)
+lines(time.grid, pred$fit, col= "black", lwd = 2)
+lines(time.grid, pred$fit + 2 * pred$se.fit, lty = "dashed")
+lines(time.grid, pred$fit - 2 * pred$se.fit, lty = "dashed")
+summary(fit)
+
+# Smoothing splines 
+fit2 <- smooth.spline(time, hazard, cv = TRUE)
+plot(time, hazard, xlim = timelims, cex = .5, col = "darkgrey")
+lines(fit2, col = "red", lwd = 2)
+
+# Comparing models 
+
+
