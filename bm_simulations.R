@@ -17,19 +17,20 @@ set.seed(1)
 pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
 
 set.seed(1)
-exps <- rexp(n = 10000, rate = 0.0001)
+exps <- rexp(n = 10000, rate = 0.00001)
 
 set.seed(1)
-weibull <- rweibull(n = 10000, shape = 1.1)
+weibull <- rweibull(n = 10000, shape = 2)
 
 ## Calculating the hazards 
-survival_object <- Surv(time = pareto) 
+survival_object <- Surv(time = exps) 
 survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
-hazard_time <- hazard_fit$time
-hazard_rates <- hazard_fit$hazard
-new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard Rate', 
-                 type = 'l', xlim = c(0, 100), ylim = c(min(hazard_rates), max(hazard_rates)))
+time <- hazard_fit$time
+hazard <- hazard_fit$hazard
+hazard_plot <- plot(x = time, y = hazard, xlab='Time', ylab = 'Hazard Rate', 
+                 type = 'l', xlim = c(0, 10000), ylim = c(min(hazard), max(hazard)))
+
 
 ### The BM functions 
 
@@ -205,6 +206,28 @@ hazard_plot <- plot(time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l',
 corr <- cor.test(x = time, y = hazard, method = 'spearman')
 rho <- corr$estimate
 rhosq <- rho^2
+
+# Manually 
+rank_time <- rank(time, ties.method = 'average')
+rank_hazard <- rank(hazard, ties.method = 'average')
+plot(x = rank_time, y = rank_hazard, type = 'l', xlab = 'Rank time', ylab = "Rank hazard")
+
+length(which(duplicated(rank_time))) == 0 & length(which(duplicated(rank_time))) == 0
+length(time) == length(hazard)
+
+rho <- function(n, rank_time, rank_hazard){
+  di2 <- numeric(length = length(rank_time))
+  for(i in 1:length(di2)){
+  di2[i] <- (rank_time[i] - rank_hazard[i])^2
+  }
+  rho <- 1 - ((6 * sum(di2)) / (n * (n^2 - 1)))
+  return(rho)
+}
+
+rho(n = length(time), rank_time,  rank_hazard)
+
+## Resampling 
+exps <- replicate(10000, rexp(n = 10000, rate = 0.0001))
 
 ## Polynomial regression
 
