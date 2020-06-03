@@ -12,15 +12,17 @@ library(survival)
 library(dplyr)
 library(dynpred)
 
-### Generate trial data from the exponential, Pareto and Weibull distributions 
+### Pseudo data 
 set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
+pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
 
 set.seed(1)
-exps <- rexp(n = 10000, rate = 0.00001)
+exps <- rexp(n = 1000, rate = 0.0001)
 
 set.seed(1)
-weibull <- rweibull(n = 10000, shape = 2)
+weibull <- rweibull(n = 10, shape = 2)
+
+## Explicit hazard functions 
 
 ## Calculating the hazards 
 survival_object <- Surv(time = exps) 
@@ -29,8 +31,28 @@ hazard_fit <- bshazard::bshazard(survival_object ~ 1)
 time <- hazard_fit$time
 hazard <- hazard_fit$hazard
 hazard_plot <- plot(x = time, y = hazard, xlab='Time', ylab = 'Hazard Rate', 
-                 type = 'l', xlim = c(0, 10000), ylim = c(min(hazard), max(hazard)))
+                 type = 'l', xlim = c(min(time), max(time)), ylim = c(min(hazard), max(hazard)))
 
+## Resample the hazard rates and check the distribution 
+RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
+detectCores() # tells you the number of cores your computer can use for the simulations 
+
+f <- function(i){
+  cor.test(x = time, y = sample(hazard, length(hazard), FALSE), method = 'spearman')
+}
+
+res <- mclapply(X = 1:10000, FUN = f, mc.cores = 8, mc.set.seed = TRUE)
+res <- unlist(res)
+res <- res[names(res) == c('estimate.rho', 'statistic.S')]
+res <- data.frame('Rho' = res[names(res) == 'estimate.rho'], 'Statistic' = res[names(res) == 'statistic.S'])
+stats <- as.numeric(res$Statistic)
+rho <- as.numeric(res$Rho)
+
+hist(stats, breaks = 100)
+
+value <- cor.test(x = time, y = hazard, method = 'spearman')
+value <- value$statistic
+abline(v = value, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
 
 ### The BM functions 
 
@@ -203,9 +225,9 @@ hazard_plot <- plot(time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l',
 ### Tests 
 
 ## Rank-order correlation 
+
+# Define the function
 corr <- cor.test(x = time, y = hazard, method = 'spearman')
-rho <- corr$estimate
-rhosq <- rho^2
 
 # Manually 
 rank_time <- rank(time, ties.method = 'average')
@@ -225,9 +247,6 @@ rho <- function(n, rank_time, rank_hazard){
 }
 
 rho(n = length(time), rank_time,  rank_hazard)
-
-## Resampling 
-exps <- replicate(10000, rexp(n = 10000, rate = 0.0001))
 
 ## Polynomial regression
 
