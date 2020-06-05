@@ -13,6 +13,8 @@ library(dplyr)
 library(dynpred)
 
 ### Pseudo data 
+
+## Generating the data 
 set.seed(1)
 pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
 
@@ -23,9 +25,52 @@ set.seed(1)
 weibull <- rweibull(n = 10, shape = 2)
 
 ## Explicit hazard functions 
+time <- c(1:1000)
 
-## Calculating the hazards 
-survival_object <- Surv(time = exps) 
+# The Weibull distribution 
+wh <- function(a, b, t){
+  h <- (b/a)*((t/a)^(b-1))
+  return(h)
+}
+
+w <- wh(a = 1, b = 4, t = time)
+plot(w, type = 'l', xlim = c(min(time), max(time)), ylim = c(min(w), max(w)))
+
+# The exponential distirbution
+eh <- function(x, b){
+  e <- numeric(length = length(x))
+  for(i in x){
+    x[i] <- 1/b
+  }
+  return(e)
+}
+
+e <- eh(x = time, b = 1)
+plot(e, type = 'l')
+
+# Pareto hazard manually 
+par <- function(x, a, b){
+  fx <- VGAM::dpareto(x, shape = a, scale = b)
+  dx <- VGAM::ppareto(x, shape = a, scale = b)
+  sx <- 1-dx
+  hx <- fx/sx
+  return(hx)
+}
+
+p <- par(x = time, a = 2, b = 1)
+plot(p, type = 'l')
+
+# Pareto hazard function from Eliazar (2017)
+ph <- function(p, t){
+  h <- ((1+p) / p)*(1/t)
+  return(h)
+}
+
+p <- ph(p = 1, t = time)
+plot(p, type = 'l', main = 'eli')
+
+## Hazards with the bshazard package  
+survival_object <- Surv(time = pareto) 
 survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
 time <- hazard_fit$time
@@ -41,14 +86,15 @@ f <- function(i){
   cor.test(x = time, y = sample(hazard, length(hazard), FALSE), method = 'spearman')
 }
 
-res <- mclapply(X = 1:10000, FUN = f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:1000, FUN = f, mc.cores = 8, mc.set.seed = TRUE)
 res <- unlist(res)
 res <- res[names(res) == c('estimate.rho', 'statistic.S')]
 res <- data.frame('Rho' = res[names(res) == 'estimate.rho'], 'Statistic' = res[names(res) == 'statistic.S'])
 stats <- as.numeric(res$Statistic)
 rho <- as.numeric(res$Rho)
 
-hist(stats, breaks = 100)
+hist(stats, breaks = 100, xlim = c(0, 1000))
+plot(stats, type = 'l')
 
 value <- cor.test(x = time, y = hazard, method = 'spearman')
 value <- value$statistic
@@ -188,22 +234,22 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 110) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 10000000)
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 900000, R = 1100000) 
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = 0, sigma = 0.15, L = 9000000, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 1000)
+e <- events(x = res, nsim = 1000, n = 1000)
 m_event <- e[[1]] # in a matrix
 df_event <- e[[2]]
 
