@@ -6,6 +6,7 @@ library(survminer)
 library(survival)
 library(dplyr)
 library(dynpred)
+library(condSURV)
 
 ### The BM functions 
 
@@ -168,13 +169,19 @@ legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
-#surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
+surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
 haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+
+survival <- surv_fit$surv
+surv_time <- surv_fit$time
 hazard <- haz_fit$hazard
-time <- haz_fit$time
-hazard_plot <- plot(time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', 
+haz_time <- haz_fit$time
+
+hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
                     xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
+
+## Conditional survival with the condSURV package 
 
 
 ## Polynomial regression
