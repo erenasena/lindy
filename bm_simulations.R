@@ -53,21 +53,25 @@ reps <- function(x){ # the input is the output vector of the change function
   max_inc <- max(data$Frequency[plus]) # the maximum number of successive increases
   max_dec <- max(data$Frequency[minus]) # the maximum number of successive decreases 
   list = list('Data' = data, 'Decreases' = max_dec, 'Increases' = max_inc)
-  return(list$Decreases)
+  return(list)
 }
 
 ### Generate trial data from the exponential, Pareto and Weibull distributions 
 set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 1.5)
+pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
 
 set.seed(1)
-exps <- rexp(n = 10000, rate = 0.0001)
+exps <- rexp(n = 10000, rate = 1)
 
 set.seed(1)
-weibull <- rweibull(n = 10000, shape = 1.1)
+weibull <- rweibull(n = 10000, shape = 0.85)
+
+set.seed(1)
+norm <- rnorm(n = 10000, mean = 0, sd = 1)
+hist(norm, breaks = 100)
 
 ## Explicit hazard functions 
-time <- c(1:1000)
+time <- c(1:10000)
 
 # The Weibull distribution 
 wh <- function(a, b, t){
@@ -102,30 +106,22 @@ par <- function(x, a, b){
 p <- par(x = time, a = 2, b = 1)
 plot(p, type = 'l')
 
-# Pareto hazard function from Eliazar (2017)
-ph <- function(p, t){
-  h <- ((1+p) / p)*(1/t)
-  return(h)
-}
-
-p <- ph(p = 1, t = time)
-plot(p, type = 'l', main = 'eli')
-
 ## Calculating the hazards with the package 
-survival_object <- Surv(time = pareto) 
+survival_object <- Surv(time = exps) 
 survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
-hazard_time <- hazard_fit$time
-hazard_rates <- hazard_fit$hazard
-new_plot <- plot(x = hazard_time, y = hazard_rates, xlab='Time', ylab = 'Hazard Rate', type = 'l', xlim = c(0, 100), ylim = c(min(hazard_rates), max(hazard_rates)))
+time <- hazard_fit$time
+hazards <- hazard_fit$hazard
+new_plot <- plot(x = time, y = hazards, xlab='Time', ylab = 'Hazard Rate', type = 'l')
 
 ## Hypothesis test on the mean difference 
 
-# Resampling the hazard rates, getting their means, getting their differences, finding the mean 
+# Resampling the hazard rates, getting their differences, finding the mean 
 # difference, and replicating this process 10,000 times to get a distribution of mean differences
-mean_diff <- mean(diff(x = hazard_rates))
-diff_dist <- replicate(10000, mean(diff(x = sample(hazard_rates, length(hazard_rates), FALSE))))
-hist(diff_dist, breaks = 100, xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
+mean_diff <- mean(diff(x = hazards))
+diff_dist <- replicate(10000, mean(diff(x = sample(p, length(p), FALSE))))
+hist(diff_dist, breaks = 100,
+     xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
 abline(v = mean_diff, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
 
 # One sided, the alternative is <
@@ -141,7 +137,7 @@ sum(abs(diff_dist) > mean_diff) / 10000 # two tailed for larger
 ## Hypothesis test on the total number of decreases 
 
 # Resampling for the sums 
-sum_minus <- sum(change(hazard_rates) == -1) # the observed total number of decreases
+sum_minus <- sum(change(e) == -1) # the observed total number of decreases
 sum_dist <- replicate(10000, sum(change(x = sample(hazard_rates, length(hazard_rates), FALSE)) == -1)) 
 hist(sum_dist, breaks = 100, xlab = 'Total number of decreases')  
 abline(v = sum_minus, col = 'red', lwd = 2)
