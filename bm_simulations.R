@@ -66,7 +66,52 @@ exps <- rexp(n = 10000, rate = 0.0001)
 set.seed(1)
 weibull <- rweibull(n = 10000, shape = 1.1)
 
-## Calculating the hazards 
+## Explicit hazard functions 
+time <- c(1:1000)
+
+# The Weibull distribution 
+wh <- function(a, b, t){
+  h <- (b/a)*((t/a)^(b-1))
+  return(h)
+}
+
+w <- wh(a = 1, b = 4, t = time)
+plot(w, type = 'l', xlim = c(min(time), max(time)), ylim = c(min(w), max(w)))
+
+# The exponential distirbution
+eh <- function(x, b){
+  e <- numeric(length = length(x))
+  for(i in x){
+    x[i] <- 1/b
+  }
+  return(e)
+}
+
+e <- eh(x = time, b = 1)
+plot(e, type = 'l')
+
+# Pareto hazard manually 
+par <- function(x, a, b){
+  fx <- VGAM::dpareto(x, shape = a, scale = b)
+  dx <- VGAM::ppareto(x, shape = a, scale = b)
+  sx <- 1-dx
+  hx <- fx/sx
+  return(hx)
+}
+
+p <- par(x = time, a = 2, b = 1)
+plot(p, type = 'l')
+
+# Pareto hazard function from Eliazar (2017)
+ph <- function(p, t){
+  h <- ((1+p) / p)*(1/t)
+  return(h)
+}
+
+p <- ph(p = 1, t = time)
+plot(p, type = 'l', main = 'eli')
+
+## Calculating the hazards with the package 
 survival_object <- Surv(time = pareto) 
 survival_fit <- survfit(survival_object ~ 1)
 hazard_fit <- bshazard::bshazard(survival_object ~ 1)
@@ -130,6 +175,12 @@ observed_max <- reps(change(hazard_rates))
 max_sucs_dist <- replicate(10000, reps(change(x = sample(hazard_rates, length(hazard_rates)))))
 hist(max_sucs_dist, breaks = 100, xlab = 'Max number of successive decreases')  
 abline(v = observed_max, col = 'red', lwd = 2)
+
+
+
+
+
+
 
 ### The BM functions 
 
