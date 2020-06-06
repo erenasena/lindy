@@ -61,7 +61,7 @@ set.seed(1)
 pareto <- VGAM::rpareto(n = 50000, scale = 1, shape = 2)
 
 set.seed(1)
-exps <- rexp(n = 100, rate = 1)
+exps <- rexp(n = 10000, rate = 1)
 
 set.seed(1)
 weibull <- rweibull(n = 10000, shape = 0.85)
@@ -94,7 +94,7 @@ eh <- function(x, b){
 e <- eh(x = time, b = 1)
 plot(e, type = 'l')
 
-# Pareto hazard manually 
+# The Pareto distribution
 par <- function(x, a, b){
   fx <- VGAM::dpareto(x, shape = a, scale = b)
   dx <- VGAM::ppareto(x, shape = a, scale = b)
@@ -151,10 +151,10 @@ sum(sum_dist > sum_minus) / 10000
 RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
 detectCores() # tells you the number of cores your computer can use for the simulations 
 
-sum_diff <- sum(change(hazard_rates) == 1) - sum(change(hazard_rates) == -1) # the observed difference
+sum_diff <- sum(change(hazards) == 1) - sum(change(hazards) == -1) # the observed difference
 
 sum_diff_fun <- function(x){
-  resampled <- sample(hazard_rates, length(hazard_rates), FALSE)
+  resampled <- sample(hazards, length(hazards), FALSE)
   changes <- change(x = resampled)
   plus <- sum(changes == 1)
   minus <- sum(changes == -1)
