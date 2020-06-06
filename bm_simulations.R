@@ -58,10 +58,10 @@ reps <- function(x){ # the input is the output vector of the change function
 
 ### Generate trial data from the exponential, Pareto and Weibull distributions 
 set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
+pareto <- VGAM::rpareto(n = 50000, scale = 1, shape = 2)
 
 set.seed(1)
-exps <- rexp(n = 10000, rate = 1)
+exps <- rexp(n = 100, rate = 1)
 
 set.seed(1)
 weibull <- rweibull(n = 10000, shape = 0.85)
@@ -119,7 +119,7 @@ new_plot <- plot(x = time, y = hazards, xlab='Time', ylab = 'Hazard Rate', type 
 # Resampling the hazard rates, getting their differences, finding the mean 
 # difference, and replicating this process 10,000 times to get a distribution of mean differences
 mean_diff <- mean(diff(x = hazards))
-diff_dist <- replicate(10000, mean(diff(x = sample(p, length(p), FALSE))))
+diff_dist <- replicate(10000, mean(diff(x = sample(hazards, length(hazards), FALSE))))
 hist(diff_dist, breaks = 100,
      xlab = 'Mean change in successive hazard rates', main = 'Distribution of mean differences between sucessive hazard rates') # a histogram showing the distribution 
 abline(v = mean_diff, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
@@ -163,7 +163,7 @@ sum_diff_fun <- function(x){
 
 sum_diff_dist <- mclapply(1:10000, sum_diff_fun, mc.cores = 8, mc.set.seed = TRUE)
 sum_diff_dist <- unlist(sum_diff_dist)
-hist(sum_diff_dist, breaks = 500, xlab = 'Increases - decreases')  
+hist(sum_diff_dist, breaks = 5, xlab = 'Increases - decreases')  
 abline(v = sum_diff, col = 'red', lwd = 2)
 
 ## Hypothesis test on the maximum number of successive increases or decreases 
@@ -171,12 +171,6 @@ observed_max <- reps(change(hazard_rates))
 max_sucs_dist <- replicate(10000, reps(change(x = sample(hazard_rates, length(hazard_rates)))))
 hist(max_sucs_dist, breaks = 100, xlab = 'Max number of successive decreases')  
 abline(v = observed_max, col = 'red', lwd = 2)
-
-
-
-
-
-
 
 ### The BM functions 
 
