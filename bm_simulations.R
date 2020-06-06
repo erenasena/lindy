@@ -1,104 +1,11 @@
 ### Survival and hazard functions of hitting times 
 
-# The necessary packages
-#install.packages("survminer")
-#install.packages("survival")
-#install.packages("dplyr")
-
 # The necessary libraries
 library(parallel)
 library(survminer)
 library(survival)
 library(dplyr)
 library(dynpred)
-
-### Pseudo data 
-
-## Generating the data 
-set.seed(1)
-pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
-
-set.seed(1)
-exps <- rexp(n = 10000, rate = 1)
-
-set.seed(1)
-weibull <- rweibull(n = 10000, shape = 2)
-
-## Explicit hazard functions 
-time <- c(1:10000)
-
-# The Weibull distribution 
-wh <- function(a, b, t){
-  h <- (b/a)*((t/a)^(b-1))
-  return(h)
-}
-
-w <- wh(a = 1, b = 4, t = time)
-plot(w, type = 'l', xlim = c(min(time), max(time)), ylim = c(min(w), max(w)))
-
-# The exponential distirbution
-eh <- function(x, b){
-  e <- numeric(length = length(x))
-  for(i in x){
-    x[i] <- 1/b
-  }
-  return(e)
-}
-
-e <- eh(x = time, b = 1)
-plot(e, type = 'l')
-
-# Pareto hazard manually 
-par <- function(x, a, b){
-  fx <- VGAM::dpareto(x, shape = a, scale = b)
-  dx <- VGAM::ppareto(x, shape = a, scale = b)
-  sx <- 1-dx
-  hx <- fx/sx
-  return(hx)
-}
-
-p <- par(x = time, a = 2, b = 1)
-plot(p, type = 'l')
-
-# Pareto hazard function from Eliazar (2017)
-ph <- function(p, t){
-  h <- ((1+p) / p)*(1/t)
-  return(h)
-}
-
-p <- ph(p = 1, t = time)
-plot(p, type = 'l', main = 'eli')
-
-## Hazards with the bshazard package  
-survival_object <- Surv(time = pareto) 
-survival_fit <- survfit(survival_object ~ 1)
-hazard_fit <- bshazard::bshazard(survival_object ~ 1)
-time <- hazard_fit$time
-hazard <- hazard_fit$hazard
-hazard_plot <- plot(x = time, y = hazard, xlab='Time', ylab = 'Hazard Rate', 
-                 type = 'l', xlim = c(min(time), max(time)), ylim = c(min(hazard), max(hazard)))
-
-## Resample the hazard rates and check the distribution 
-RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
-detectCores() # tells you the number of cores your computer can use for the simulations 
-
-f <- function(i){
-  cor.test(x = time, y = sample(hazard, length(hazard), FALSE), method = 'spearman')
-}
-
-res <- mclapply(X = 1:1000, FUN = f, mc.cores = 8, mc.set.seed = TRUE)
-res <- unlist(res)
-res <- res[names(res) == c('estimate.rho', 'statistic.S')]
-res <- data.frame('Rho' = res[names(res) == 'estimate.rho'], 'Statistic' = res[names(res) == 'statistic.S'])
-stats <- as.numeric(res$Statistic)
-rho <- as.numeric(res$Rho)
-
-hist(stats, breaks = 100, xlim = c(0, 1000))
-plot(stats, type = 'l')
-
-value <- cor.test(x = time, y = hazard, method = 'spearman')
-value <- value$statistic
-abline(v = value, col = 'red', lwd = 2) # drawing a line to locate our observed mean 
 
 ### The BM functions 
 
@@ -234,8 +141,8 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 900000, R = 1100000) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = 0, sigma = 0.15, L = 9000000, R = 10000000)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 1100000) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = 0, sigma = 0.15, L = 9000000, R = 10000000)
 }
 
 set.seed(1)
@@ -268,31 +175,7 @@ time <- haz_fit$time
 hazard_plot <- plot(time, hazard, xlab='Time', ylab = 'Hazard Rate', type = 'l', 
                     xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
-### Tests 
 
-## Rank-order correlation 
-
-# Define the function
-corr <- cor.test(x = time, y = hazard, method = 'spearman')
-
-# Manually 
-rank_time <- rank(time, ties.method = 'average')
-rank_hazard <- rank(hazard, ties.method = 'average')
-plot(x = rank_time, y = rank_hazard, type = 'l', xlab = 'Rank time', ylab = "Rank hazard")
-
-length(which(duplicated(rank_time))) == 0 & length(which(duplicated(rank_time))) == 0
-length(time) == length(hazard)
-
-rho <- function(n, rank_time, rank_hazard){
-  di2 <- numeric(length = length(rank_time))
-  for(i in 1:length(di2)){
-  di2[i] <- (rank_time[i] - rank_hazard[i])^2
-  }
-  rho <- 1 - ((6 * sum(di2)) / (n * (n^2 - 1)))
-  return(rho)
-}
-
-rho(n = length(time), rank_time,  rank_hazard)
 
 ## Polynomial regression
 
