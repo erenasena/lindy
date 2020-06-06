@@ -19,13 +19,13 @@ set.seed(1)
 pareto <- VGAM::rpareto(n = 10000, scale = 1, shape = 2)
 
 set.seed(1)
-exps <- rexp(n = 1000, rate = 0.0001)
+exps <- rexp(n = 10000, rate = 1)
 
 set.seed(1)
-weibull <- rweibull(n = 10, shape = 2)
+weibull <- rweibull(n = 10000, shape = 2)
 
 ## Explicit hazard functions 
-time <- c(1:1000)
+time <- c(1:10000)
 
 # The Weibull distribution 
 wh <- function(a, b, t){
