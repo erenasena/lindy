@@ -1,16 +1,15 @@
-### Survival and hazard functions of hitting times 
-
 # The necessary libraries
-library(parallel)
-library(survminer)
-library(survival)
-library(dplyr)
-library(dynpred)
-library(condSURV)
+library(dplyr) # don't know why 
+library(parallel) # to run the parallel simulations 
+library(ggplot2) # to plot the Brownian motion simulations
+library(survival) # survival analysis
+library(survminer) # to plot the survival curves 
+library(dynpred) # to compute conditional survival 
+library(qualityTools) # for the Q-Q plots 
 
-### The BM functions 
+### The Brownian motion functions 
 
-## Arithmetic Brownian Motion (resamples until the value is below the boundary)  
+## Arithmetic Brownian Motion (resamples until the value is below the reflecting barrier)  
 my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   
   dt <- t/n 
@@ -55,7 +54,7 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
 }
 
 
-## Geometric Brownian Motion (the new value is the barrier value until it is below)
+## Geometric Brownian Motion (the new value equals the reflecting barrier until it is below it)
 my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
   dt <- t/n 
   sig2 <- sigma^2 
@@ -106,8 +105,8 @@ detectCores() # tells you the number of cores your computer can use for the simu
 ## Storing the values: These two functions will allow us to nealty store the resutls. It is easier to 
 ## define them before running the simulations. I wrote them because the results of parallel simulations are a mess. 
 
-# The BM values 
-values <- function(x, nsim, n){
+# A function to store the BM values in a nice form 
+values <- function(x, nsim, n){ 
   u <- unlist(x)
   u <- u[-which(names(u) == "Event time")]
   u <- u[-which(names(u) == "Event status")]  
@@ -118,7 +117,7 @@ values <- function(x, nsim, n){
   return(store)
 }
 
-# The hitting times 
+# A function to store the hitting times 
 times <- function(x, nsim, n){
   u <- unlist(x)
   u <- u[-which(names(u) != "Event time")]
@@ -129,7 +128,7 @@ times <- function(x, nsim, n){
   return(store)
 }
 
-# The event / censoring times 
+# A function to store the event / censoring times 
 events <- function(x, nsim, n){
   u <- unlist(x)
   u <- u[-which(names(u) != "Event status")]
@@ -142,96 +141,86 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 1100000) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = 0, sigma = 0.15, L = 9000000, R = 10000000)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:8973, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 1000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 8973, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 1000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 8973, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 1000, n = 1000)
-m_event <- e[[1]] # in a matrix
+e <- events(x = res, nsim = 8973, n = 1000)
+m_event <- e[[1]] 
 df_event <- e[[2]]
 
-# Histogram of hitting times
-hist(m_times, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
+data <- cbind(df_times, df_event)
+
+## Guessing the distribution 
+
+# Histogram of the hitting times
+hist(data$`Hitting time`, breaks = 10, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
+
+# Descriptive statistics of the hitting times
+quantile(data$`Hitting time`) # the sample quantiles
+ext <- m_times[which(data$`Hitting time` > 250)] # the extreme values 
+length(ext) / length(data$`Hitting time`) # what proportion of data are larger than a certain value 
+sum(ext) / sum(data$`Hitting time`) # what proportion of the sum they make
+
+# Q-Q Plot to check exponentiality (if concave, there might be heavy tailedness)
+hittings <- sort(data$`Hitting time`) # sort the data
+p <- ppoints(hittings, length(hittings)) # get the probabilities of the data
+s <- quantile(x = hittings, p = p) # sample quantiles
+q <- qexp(p = p) # exponential quantiles 
+qqplot(x = s, y = q, xlab = "Sample quantiles", ylab = "Theoretical quantiles", 
+       main = "Exponential QQ Plot")
+
+
+qqPlot(x = data$`Hitting time`, y = "exponential", xlab = "Sample quantiles", 
+       ylab = "Theoretical quantiles", main = "Exponential Q-Q Plot") # shorter way with confidence bands
+
+
+# Zipf plot to check for power law decay 
+hittings <- sort(data$`Hitting time`) # sort the data
+fit <- ecdf(hittings) # empirical cumulative distribution function
+s <- 1 - fit(hittings) # empirical survival function  
+logs <- log(s) # the log of the survival function 
+logx <- log(hittings) # the log of the sorted failure times 
+
+plot(x = logx, y = logs, # if linear, indication of power law 
+     xlab = "log(failure times)", ylab = "log(survival function)", 
+     main = "The Zipf Plot") 
 
 ### Survival curves and fitting the model 
 surv_data <- data.frame(Time = m_times, Event = m_event, row.names = paste0("Sim", 1:nrow(m_times), ""))
 surv_object <- Surv(time = m_times, event = m_event) 
 surv_fit <- survfit(surv_object ~ 1)
-surv_plot <- plot(x = surv_fit$time, y = surv_fit$surv, type = 'l', xlab = "Time")
 haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 
 survival <- surv_fit$surv
 surv_time <- surv_fit$time
+
 hazard <- haz_fit$hazard
 haz_time <- haz_fit$time
 
 hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
-                    xlim = c(0, 1000), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
+                    xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
-
-## Conditional survival with the condSURV package 
-
-
-## Polynomial regression
-
-# Prepare the data 
-data <- data.frame(time = time, hazards = hazard)
-timelims <- range(time)
-time.grid <- seq(from = timelims[1], to = timelims[2])
-
-# The models 
-fit.1 <- lm(hazard ~ time, data = data)
-fit.2 <- lm(hazard ~ poly(time, 2), data = data)
-fit.3 <- lm(hazard ~ poly(time, 3), data = data)
-fit.4 <- lm(hazard ~ poly(time, 4), data = data)
-fit.5 <- lm(hazard ~ poly(time, 5), data = data)
-fit.6 <- lm(hazard ~ poly(time, 6), data = data)
-fit.7 <- lm(hazard ~ poly(time, 7), data = data)
-fit.8 <- lm(hazard ~ poly(time, 8), data = data)
-fit.9 <- lm(hazard ~ poly(time, 9), data = data)
-fit.10 <- lm(hazard ~ poly(time, 10), data = data)
-fit.20 <- lm(hazard ~ poly(time, 20), data = data)
-
-# Plotting the predictions
-preds <- predict(fit.10, newdata = list(time = time.grid), se = TRUE)
-se.bands <- cbind(preds$fit + 2 * preds$se.fit, preds$fit - 2 * preds$se.fit)
-
-plot(x = time, y = hazard, xlim = timelims, cex = .5, col = "darkgrey")
-lines(time.grid , preds$fit, lwd = 2, col = "blue")
-matlines(time.grid, se.bands , lwd = 1, col = "blue", lty = 3)
-
-# Comparing the models 
-anova(fit.1, fit.2, fit.3, fit.4, fit.5, fit.6, fit.7, fit.8, fit.9, fit.10, fit.20)
-
-## Regression splines
-library(splines)
-
-# Natural spline 
-fit <- lm(hazard ~ ns(time, df = 8), data = data)
-plot(x = time, y = hazard, xlim = timelims, cex = .5, col = "darkgrey")
-pred = predict(fit, newdata = list(time = time.grid), se = T)
-lines(time.grid, pred$fit, col= "black", lwd = 2)
-lines(time.grid, pred$fit + 2 * pred$se.fit, lty = "dashed")
-lines(time.grid, pred$fit - 2 * pred$se.fit, lty = "dashed")
-summary(fit)
-
-# Smoothing splines 
-fit2 <- smooth.spline(time, hazard, cv = TRUE)
-plot(time, hazard, xlim = timelims, cex = .5, col = "darkgrey")
-lines(fit2, col = "red", lwd = 2)
-
-# Comparing models 
-
-
+## Conditional survival
+fit <- Fwindow(object = surv_fit, width = 10, variance = TRUE, conf.level = 0.95)
+con_time <- fit$time # the calculated times
+con_death <- fit$Fw # conditional death 
+con_surv <- 1 - con_death # conditional survival; they are mirror images
+plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time', 
+     ylab = 'Probability', main = 'Conditional survival and death over time',
+     ylim = c(0, 1), xlim = c(min(con_time), max(con_time)))
+lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
+cond <- data.frame(con_time, con_surv, con_death)
+colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
