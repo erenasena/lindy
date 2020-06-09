@@ -377,8 +377,17 @@ haz_time <- haz_fit$time
 hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
                     xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
+
+# Rank correlation 
+exp <- rexp(n = 1000, rate = 0.0000001)
+surv_object <- Surv(time = exp)
+surv_fit <- survfit(surv_object ~ 1)
+haz <- bshazard::bshazard(surv_object ~ 1)
+plot(haz$time, haz$hazard)
+test <- cor.test(x = haz$time, y = haz$hazard, method = "spearman")
+
 ## Conditional survival
-fit <- Fwindow(object = surv_fit, width = 100, variance = TRUE, conf.level = 0.95)
+fit <- Fwindow(object = surv_fit, width = 1, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
@@ -388,3 +397,6 @@ plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time',
 lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
 cond <- data.frame(con_time, con_surv, con_death)
 colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
+
+
+
