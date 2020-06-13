@@ -148,22 +148,22 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 2000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 100, n = 2000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 100, n = 2000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 1000)
+e <- events(x = res, nsim = 100, n = 2000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -185,7 +185,7 @@ ms <- function(x, p){ # x is the hitting times vector, p is the moment for which
   return(list("MS" = ms, "n" = n))
 }
 
-ratio <- ms(x = data$`Hitting time`, p = 4) # if kurtosis is defined, the rest is defined also 
+ratio <- ms(x = data$time, p = 4) # if kurtosis is defined, the rest is defined also 
 plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "Max / sum ratio")
 
 # Descriptive statistics of the hitting times; moments are defined so we can get mean and sd 
@@ -197,11 +197,11 @@ length(ext) / length(data$`Hitting time`) # what proportion of data are larger t
 sum(ext) / sum(data$`Hitting time`) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$`Hitting time`, breaks = 100, xlim = c(0, 10010), main = 'GBM with an absorbing barrier')
+hist(data$`Hitting time`, breaks = 10, xlim = c(0, 2000), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
-hittings <- sort(data$`Hitting time`) # sort the data
+hittings <- sort(data$time) # sort the data
 p <- ppoints(hittings, length(hittings)) # get the probabilities of the data
 s <- quantile(x = hittings, p = p) # sample quantiles
 q <- qexp(p = p) # exponential quantiles 
@@ -212,7 +212,7 @@ qqPlot(x = data$`Hitting time`, y = "exponential", xlab = "Sample quantiles",
        ylab = "Theoretical quantiles", main = "Exponential Q-Q Plot") # shorter way with confidence bands
 
 # Zipf / log-log plot to check for power law decay (linearity indicates power law)
-hittings <- sort(data$`Hitting time`) # sort the data
+hittings <- sort(data$time) # sort the data
 fit <- ecdf(hittings) # empirical cumulative distribution function
 s <- 1 - fit(hittings) # empirical survival function  
 logs <- log(s) # the log of the survival function 
@@ -241,11 +241,11 @@ zipfplot <- function (data, type = "plot", title = TRUE){
     }
 }
 
-zipfplot(data = data$`Hitting time`)
+zipfplot(data = data$time)
 
 # Mean excess (ME) plot (linearity indicates power law, concavity lognorm, constant exp, decreasing norm)
-evir::meplot(sort(data$`Hitting time`)) 
-VGAM::meplot(sort(data$`Hitting time`)) # gives confidence bands
+evir::meplot(sort(data$time)) 
+VGAM::meplot(sort(data$time)) # gives confidence bands
 
 meplot <- function(data, cut = 5){
   # In cut you can specify the number of maxima you want to exclude. # The standard value is 5
@@ -337,7 +337,7 @@ moment_plot <- function(data){
   return(c(CV, skew))
 }
 
-moments <- moment_plot(data = data$`Hitting time`)
+moments <- moment_plot(data = data$time)
 
 # Zenga plot 
 zengaplot <- function(data){
@@ -356,7 +356,7 @@ zengaplot <- function(data){
   plot(est$p, Zu, xlab = "u", ylab = "Z(u)", ylim = c(0, 1), main = "Zenga plot", "l", lty = 1)
 }
 
-zengaplot(data = data$`Hitting time`)
+zengaplot(data = data$time)
 
 # Fit a distribution with various method
 fitdistrplus::fitdist(data = data$`Hitting time`, distr = "gamma", method = "mle") # parameter est. 
