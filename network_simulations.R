@@ -6,75 +6,64 @@ library(parallel)
 md_data <- data.matrix(read.table("md_data.txt", header = F))
 colnames(md_data) <- c("dep", "int", "los", "gai", "dap", "iap", "iso", "hso", "agi", 
                        "ret", "fat", "wor", "con", "dea")
-### Simulations
-states <- function(data, c, n) { # data is a matrix 
-  # c is the connectivity parameter 
-  # n is the number of time points
-  
-  ####### Fitting the Ising model to estimate weights and biases ####### 
-  
-  fit <- IsingFit::IsingFit(x = data) # x must be cross-sectional data
 
-    ####### Creating the network ####### 
+### This function computes the total number of active symptoms at each time point for n networks. 
+lindynet <- function(data, c, n, nsim) { # data must be a matrix 
+                                         # c is the connectivity parameter 
+                                         # n is the number of time points
+  
+  states <- function(data, c, n) {
+
+  fit <- IsingFit::IsingFit(x = data) # x must be cross-sectional data
   
   j <- ncol(data) # number of symptoms
-  b <- abs(fit$thresholds) # thresholds 
-  W <- fit$weiadj # weights 
-  P <- X <- matrix(0, n, j) # matrix with probabilities (P) and simulated data (X); full of 0s initially
-  W <- c * W # multiply the weights by the connectivity parameter 
+  b <- abs(fit$thresholds) 
+  W <- fit$weiadj 
+  P <- X <- matrix(0, n, j) # matrix with probabilities (P) and simulated data (X): initially 0s. 
+  W <- c * W 
   
   for (t in 2:n) { 
     A <- X[t - 1,] %*% W # the activation function (formula (1) in paper)
     P[t,] <- 1 / (1 + exp(b - A)) # the probability function (formula (2) in paper)
-    X[t,] <- 1 * (P[t,] > runif(j)) # symptom i becomes active ( = 1) if the probability is greater than randomly chosen uniformly distributed number between 0 and 1
+    X[t,] <- 1 * (P[t,] > runif(j)) # symptom i becomes active ( = 1) if the probability is greater 
+                                    # than randomly chosen uniformly distributed number between 0 & 1
   }
-  states <- apply(X, 1, sum)
+  states <- apply(X, 1, sum) # compute the total number of symptoms per row (time point)
   return(states)
-}
-## Creating a function that returns the number of symptoms per time point for n networks 
-lindynet <- function(data, c, n, nsim) { # connectivity, number of time points, number of networks to be simulated
+  }
   
-  
-  ################ This function creates a network ################ 
-  f <- function(i){
+  f <- function(i) { # replicating the state function for n networks
     states(data = data, c = c, n = n)
   }
-  
-  ################ This function replicates the state function and stores the values ################ 
-  
   res <- matrix(data = replicate(n = nsim, expr = states(data = data, c = c, n = n)), 
-                nrow = nsim, ncol = n, byrow = TRUE) 
+                  nrow = nsim, ncol = n, byrow = TRUE) 
   dimnames(res) <- list(paste0("Network", 1:nsim, ""), paste0("t", 1:n, ""))
   return(res)
 }
 
 set.seed(1)
-X <- lindynet(data = md_data, c = 1.2, n = 10000, nsim = 100) 
+X <- lindynet(data = md_data, c = 1.3, n = 10, nsim = 2) 
 
-# For each network, index when they are depressed for the first time 
-start <- function(X, threshold) { # X is the output matrix of the lindynet function 
-                                  # threshold is the required number of active symptoms for depression 
+### This function prepares the data for survival analysis 
+survnet <- function(X, threshold) { # X is the output matrix of the lindynet function 
+                                    # threshold is the required number of active symptoms
   start <- numeric(length = nrow(X))
   for(i in 1:nrow(X)) {
-    start[i] <- which(X[i,] >= threshold)[1]
+    start[i] <- which(X[i,] >= threshold)[1] # index when the network is depressed for the first time
   }
-  return(start)
-}
-
-# For each network, start counting time when it's on and stop when it goes below the threshold
-index <- function(X, threshold) {
-  start <- start(X = X, threshold = threshold)
-  if(any(is.na(start)) == TRUE) {
+  
+  if(any(is.na(start)) == TRUE) { 
     X <- X[-(which(is.na(start) == TRUE)), ] # remove the networks that never became depressed
-    } else { 
-      X <- X 
+  } else { 
+    X <- X 
   }
+  
   start <- start[!is.na(start)]
   time <- numeric(length = nrow(X))
   event <- numeric(length = nrow(X))
   
   for(i in 1:nrow(X)) {
-    for(j in start[i]:ncol(X)) {
+    for(j in start[i]:ncol(X)) { # start counting time from the first depressed point on 
       
       if(X[i, j] >= threshold & j < ncol(X)) {
         time[i] <- time[i] + 1
@@ -95,36 +84,107 @@ index <- function(X, threshold) {
   return(data)
 }
 
-failures <- index(X = X, threshold = 5)
-data <- as.data.frame(failures)
-hist(data$time)
+data <- as.data.frame(survnet(X = X, threshold = 1))
+hist(data$time, breaks = 10, xlab = 'Time', main = "Time distribution of transitions")
+legend(x = "center", legend = c('c = 1.3', 'n = ', 'nsim = ', 'threshold = '))
 
-### Survival analysis 
-surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:nrow(failures), ""))
-surv_object <- Surv(time = data$time, event = data$event) 
-surv_fit <- survfit(surv_object ~ 1)
-haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
+## A function for the symptom level 
+symptom <- function(X, n){
+  event <- numeric(length = ncol(X))
+  dead_start <- numeric(length = ncol(X))
+  dead_end <- numeric(length = ncol(X))
+  data_from_birth <- numeric()
+  rle_data <- numeric()
+  values <- numeric() # Values in the symptom: 0-1-0
+  reps <- numeric() # How many times each value repeats 
+  start <- numeric(length = ncol(X))
+  
+  for(j in 1:ncol(X)){ # First indexing the jth column of X 
+    data <- cbind(X[,j])
+    start[j] <- start_fun(data) # When the symptom is 1 for the first time in column j of X 
+  }
+  for(j in 1:length(start)){
+    data_from_birth <- data[start[j]:nrow(data),]
+    rle_data <- rle(as.vector(data_from_birth))
+    values <- rle_data[[2]] 
+    reps <- rle_data[[1]]
+  }
+  for(i in 1:length(values)){
+    for(j in 1:length(event)){
+      if(values[i] == 0 & reps[i] >= 2){
+        event[j] <- 1
+        break
+      }
+    }
+  }
+  for(i in 1:length(values)){
+    for(j in 1:length(event)){
+      if(values[i] == 0 & !(any(reps[i] >= 2))){
+        event[j] <- 0
+      }
+    }
+  }
+  
+  rep_deaths <- which(values == 0 & reps >= 2)
+  deaths.lengths.cumsum <- cumsum(reps)
+  ends <- deaths.lengths.cumsum[rep_deaths] # Until which time point the symptom remained 0. 
+  newindex <- ifelse(rep_deaths > 1, rep_deaths-1, 0)
+  dead <- deaths.lengths.cumsum[newindex] + 1
+  if (0 %in% newindex){
+    dead <- c(1, dead)} #The start point of death (0).
+  
+  for(j in 1:length(start)){
+    if(event == 1){
+      time <- start[j] + dead - 1 # The point at which it starts being 0 in succession 
+      time_2 <- start[j] + ends - 1 # The last 0 in the succession of 0s
+    } else {
+      time <- nrow(s1)
+      time_2 <- nrow(s1)
+    }
+  }
+  return(dead_end)
+}
 
-survival <- surv_fit$surv
-surv_time <- surv_fit$time
+symptom <- function()
 
-hazard <- haz_fit$hazard
-haz_time <- haz_fit$time
 
-hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
-                    xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
-## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
-con_time <- fit$time # the calculated times
-con_death <- fit$Fw # conditional death 
-con_surv <- 1 - con_death # conditional survival; they are mirror images
-plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time', 
-     ylab = 'Probability', main = 'Conditional survival and death over time',
-     ylim = c(0, 1), xlim = c(min(con_time), max(con_time)))
-lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
-cond <- data.frame(con_time, con_surv, con_death)
-colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## This function adds the stress parameter but is incomplete
 stress <- function(data, c, n){

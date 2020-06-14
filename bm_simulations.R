@@ -55,7 +55,7 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
         break
       }
     }
-    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+    values <- list("values" = X, "time" = event_time, "event" = event_status)
   }
     return(values)
 }
@@ -100,7 +100,7 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
         
       }
     }
-    values <- list("Values" = X, "Event time" = event_time, "Event status" = event_status)
+    values <- list("values" = X, "time" = event_time, "event" = event_status)
   }
   return(values)
 }
@@ -115,11 +115,11 @@ detectCores() # tells you the number of cores your computer can use for the simu
 # A function to store the BM values in a nice form 
 values <- function(x, nsim, n){ 
   u <- unlist(x)
-  u <- u[-which(names(u) == "Event time")]
-  u <- u[-which(names(u) == "Event status")]  
+  u <- u[-which(names(u) == "time")]
+  u <- u[-which(names(u) == "event")]  
   m <- matrix(data = u, nrow = nsim, ncol = length(0:n), byrow = TRUE)
-  df <- data.frame(x = t(m), row.names = paste0("Time", 0:n, ""))
-  colnames(x = df) <- paste0("Sim", 1:nsim, "")
+  df <- data.frame(x = t(m), row.names = paste0("time", 0:n, ""))
+  colnames(x = df) <- paste0("sim", 1:nsim, "")
   store <- list(m, df)
   return(store)
 }
@@ -127,10 +127,10 @@ values <- function(x, nsim, n){
 # A function to store the hitting times 
 times <- function(x, nsim, n){
   u <- unlist(x)
-  u <- u[-which(names(u) != "Event time")]
+  u <- u[-which(names(u) != "time")]
   m <- matrix(data = u, nrow = nsim, ncol = 1, byrow = TRUE)
-  df <- data.frame(x = m, row.names = paste0("Sim", 1:nsim, ""))
-  colnames(x = df) <- "Hitting time"
+  df <- data.frame(x = m, row.names = paste0("sim", 1:nsim, ""))
+  colnames(x = df) <- "time"
   store <- list(m, df)
   return(store)
 }
@@ -138,32 +138,32 @@ times <- function(x, nsim, n){
 # A function to store the event / censoring times 
 events <- function(x, nsim, n){
   u <- unlist(x)
-  u <- u[-which(names(u) != "Event status")]
+  u <- u[-which(names(u) != "event")]
   m <- matrix(data = u, nrow = nsim, ncol = 1, byrow = TRUE)
-  df <- data.frame(x = m, row.names = paste0("Sim", 1:nsim, ""))
-  colnames(x = df) <- "Event"
+  df <- data.frame(x = m, row.names = paste0("sim", 1:nsim, ""))
+  colnames(x = df) <- "event"
   store <- list(m, df)
   return(store)
 }
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 2000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 100, n = 2000) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 100, n = 2000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 100, n = 2000)
+e <- events(x = res, nsim = 10000, n = 10000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -189,15 +189,15 @@ ratio <- ms(x = data$time, p = 4) # if kurtosis is defined, the rest is defined 
 plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "Max / sum ratio")
 
 # Descriptive statistics of the hitting times; moments are defined so we can get mean and sd 
-mean <- mean(data$`Hitting time`)
-sd <- sd(data$`Hitting time`)
-quantile(data$`Hitting time`) 
-ext <- m_times[which(data$`Hitting time` > 250)] # the extreme values 
-length(ext) / length(data$`Hitting time`) # what proportion of data are larger than a certain value 
-sum(ext) / sum(data$`Hitting time`) # what proportion of the sum they make
+mean <- mean(data$time)
+sd <- sd(data$time)
+quantile(data$time) 
+ext <- m_times[which(data$time > 250)] # the extreme values 
+length(ext) / length(data$time) # what proportion of data are larger than a certain value 
+sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$`Hitting time`, breaks = 10, xlim = c(0, 2000), main = 'GBM with an absorbing barrier')
+hist(data$time, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
@@ -208,7 +208,7 @@ q <- qexp(p = p) # exponential quantiles
 qqplot(x = s, y = q, xlab = "Sample quantiles", ylab = "Theoretical quantiles", 
        main = "Exponential QQ Plot")
 
-qqPlot(x = data$`Hitting time`, y = "exponential", xlab = "Sample quantiles", 
+qqPlot(x = data$time, y = "exponential", xlab = "Sample quantiles", 
        ylab = "Theoretical quantiles", main = "Exponential Q-Q Plot") # shorter way with confidence bands
 
 # Zipf / log-log plot to check for power law decay (linearity indicates power law)
@@ -219,6 +219,7 @@ logs <- log(s) # the log of the survival function
 logx <- log(hittings) # the log of the sorted failure times 
 
 plot(x = logx, y = logs, xlab = "log(failure times)", ylab = "log(survival function)", main = "The Zipf Plot") 
+legend(x = "center", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 zipfplot <- function (data, type = "plot", title = TRUE){
   # type should be equal to ’points’ if you want to add the
@@ -246,6 +247,7 @@ zipfplot(data = data$time)
 # Mean excess (ME) plot (linearity indicates power law, concavity lognorm, constant exp, decreasing norm)
 evir::meplot(sort(data$time)) 
 VGAM::meplot(sort(data$time)) # gives confidence bands
+legend(x = "bottomleft", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 meplot <- function(data, cut = 5){
   # In cut you can specify the number of maxima you want to exclude. # The standard value is 5
@@ -259,7 +261,7 @@ meplot <- function(data, cut = 5){
   plot(data_out, mex_out, xlab = "Threshold u", ylab = "Mean Excess e(u)", main = "Mean Excess Plot (Meplot)")
 }
 
-meplot(data = data$`Hitting time`, cut = 5)
+meplot(data = data$time, cut = 5)
 
 # Discriminant moment ratio plot; this is supposed to discriminate the distribution but is a bit faulty
 moment_plot <- function(data){
@@ -338,6 +340,7 @@ moment_plot <- function(data){
 }
 
 moments <- moment_plot(data = data$time)
+legend(x = "top", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 # Zenga plot 
 zengaplot <- function(data){
@@ -357,6 +360,7 @@ zengaplot <- function(data){
 }
 
 zengaplot(data = data$time)
+legend(x = "center", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 # Fit a distribution with various method
 fitdistrplus::fitdist(data = data$`Hitting time`, distr = "gamma", method = "mle") # parameter est. 
@@ -364,8 +368,8 @@ ks.test(x = data$`Hitting time`, y = lognorm)
 lognorm <- rlnorm(n = 8973, meanlog = 5.447188) # trying to see if matches the other graphs
 
 ### Survival analysis 
-surv_data <- data.frame(Time = data$`Hitting time`, Event = data$Event, row.names = paste0("Sim", 1:nrow(m_times), ""))
-surv_object <- Surv(time = data$`Hitting time`, event = data$Event) 
+surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:length(data$time), ""))
+surv_object <- Surv(time = data$time, event = data$event) 
 surv_fit <- survfit(surv_object ~ 1)
 haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 
@@ -379,7 +383,7 @@ hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate
                     xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 1, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 10, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
