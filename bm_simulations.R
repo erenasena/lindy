@@ -192,12 +192,12 @@ plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "M
 mean <- mean(data$time)
 sd <- sd(data$time)
 quantile(data$time) 
-ext <- m_times[which(data$time > 250)] # the extreme values 
+ext <- data$time[which(data$time > 325)] # the extreme values 
 length(ext) / length(data$time) # what proportion of data are larger than a certain value 
 sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$time, breaks = 100, xlim = c(0, 1010), main = 'GBM with an absorbing barrier')
+hist(data$time, breaks = 100, xlim = c(0, 750), main = 'GBM with an absorbing barrier')
 legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
@@ -363,9 +363,9 @@ zengaplot(data = data$time)
 legend(x = "center", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 # Fit a distribution with various method
-fitdistrplus::fitdist(data = data$`Hitting time`, distr = "gamma", method = "mle") # parameter est. 
-ks.test(x = data$`Hitting time`, y = lognorm)
-lognorm <- rlnorm(n = 8973, meanlog = 5.447188) # trying to see if matches the other graphs
+fitdistrplus::fitdist(data = data$time, distr = "lnorm", method = "mle") # parameter est. 
+ks.test(x = data$time, y = lnorm)
+lnorm <- rlnorm(n = 100, 0.6049935, 1.6917828) # trying to see if matches the other graphs
 
 ### Survival analysis 
 surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:length(data$time), ""))
