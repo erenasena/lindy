@@ -9,28 +9,40 @@ md_data <- data.matrix(read.table("md_data.txt", header = F))
 colnames(md_data) <- c("dep.mood", "loss.int", "w.loss", "w.gain", "dec.app", "inc.app", "insomnia", 
                        "hypsomnia", "psycm.agit", "psycm.ret", "fatigue", "worth", "conc.prob", "death")
 
-
 ################## The Functions ################## 
-
 # This function computes the total number of active symptoms at each time point for n networks. 
-lindynet <- function(data, c, t) { # data must be a matrix 
-                                   # c is the connectivity parameter 
-                                   # t is the number of time points
-
+lindynet <- function(data, t) { # data must be a matrix 
+                                                 # t is the number of time points
+                                                 # min, max and delta go into the connectivity vector
+  
+  ## Vectors to be sampled from in each network 
+  stress <- seq(from = -15, to = 15, by = 0.01)
+  connectivity <- seq(from = 0.8, to = 1.3, by = 0.1) # smaller increments are generally better
+  time <- c(2:t)
+  
+  # The Ising model  
   fit <- IsingFit::IsingFit(x = data, plot = FALSE) # x must be cross-sectional data
   
+  # The network
   j <- ncol(data) # number of symptoms
   b <- abs(fit$thresholds) 
   W <- fit$weiadj 
   P <- X <- matrix(data = 0, nrow = t, ncol = j) # matrix with probabilities (P) and simulated data (X): initially 0s. 
+  c <- sample(x = connectivity, size = 1, replace = FALSE) # the connectivity parameter is random for each network
   W <- c * W 
-  
+  s <- sample(x = stress, size = 1, replace = FALSE)
+  stime <- sample(x = time, size = 1)
+    
   for (t in 2:t) { 
-    A <- X[t - 1,] %*% W # the activation function (formula (1) in paper)
+    if(t == stime) { # if the network is at the randomly sampled time point, 
+      A <- X[t - 1,] %*% W + s # hit the network with a randomly sampled stress parameter
+    } else {
+      A <- X[t - 1,] %*% W 
+    }
     P[t,] <- 1 / (1 + exp(b - A)) # the probability function (formula (2) in paper)
     X[t,] <- 1 * (P[t,] > runif(j)) # symptom i becomes active ( = 1) if the probability is greater 
                                     # than randomly chosen uniformly distributed number between 0 & 1
-  }
+    }
   states <- apply(X, 1, sum) # compute the total number of symptoms per row (time point)
   network <- list("states" = states, "symptoms" = X)
   return(network)
@@ -82,17 +94,20 @@ survnet <- function(X, threshold) { # X is the output matrix of the lindynet fun
 RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
 detectCores() # tells you the number of cores your computer can use for the simulations 
 
-## Set up the parameters 
+## Set up the parameters
 t <- 10000
 nsim <- 100
-c <- 1.1
 threshold <- 5 # how many active symptoms to consider the network "depressed"? 
-n <- 1 # how many successive time points does a symptom need to be 0 to be considered "dead"? 
-j <- 14 # number of symptoms
+#c<- 1.1
+#min <- 0.8
+#max <- 1.225
+#delta = 0.1
+#n <- 1 # how many successive time points does a symptom need to be 0 to be considered "dead"? 
+#j <- 14 # number of symptoms
 
 ## Prepare the function 
 f <- function(i) {
-  lindynet(data = md_data, c = c, t = t)
+  lindynet(data = md_data, t = t)
 }
 
 ## Run the simulations and store the data 
@@ -105,9 +120,7 @@ states <- matrix(data = unlist(results)[which(names(unlist(results)) == states)]
 dimnames(x = states) <- list(paste0("Network", 1:nsim, ""), paste0("t", 1:t, ""))
 data <- as.data.frame(survnet(X = states, threshold = threshold)) # transition times
 hist(data$time, breaks = 15, xlab = 'Time', main = 'Time distribution of transitions')
-legend(x = "center", legend = c(paste("c", "=", c), paste("time", "=", time), 
-                                paste("nsim", "=", nsim), paste("threshold", "=", threshold)))
-
+                                
 # The symptom states
 symptom <- matrix(data = NA, nrow = t, ncol = ncol(md_data))
 symptoms <- rep(list(x = symptom), nsim)
@@ -196,71 +209,3 @@ insom_events <- cbind(data$events[,'insomnia'])
 hist(dep_times, breaks = 25, main = "Failure time distribution of loss of interest", xlab = "Time")
 legend(x = "center", legend = c(paste("c", "=", c), paste("time", "=", t), paste("nsim", "=", nsim)))
 data <- data.frame('time' = dep_times, 'event' = dep_event)
-
-## This function adds the stress parameter but is incomplete
-stress <- function(data, c, n){
-  
-  ################ Fitting the Ising model to estimate weights and biases ################ 
-  fit <- IsingFit(data) # x must be cross-sectional data
-    
-  ################ Creating the network ################ 
-  S <- delta <- rep(0, n)
-  delta[1] <- 1
-  step <- 0.01
-  Smax <- 15
-    
-  j <- ncol(data) # number of symptoms
-  b <- abs(fit$thresholds) # thresholds 
-  W <- fit$weiadj # weights 
-  P <- X <- matrix(0, n, j) # matrix with probabilities (P) and simulated data (X); full of 0s initially
-  W <- c * W # now W has 3 matrices, each with the original weights multiplied by a connectivity value
-    
-  for (t in 2:n) {
-    if (abs(S[t - 1]) > Smax) {
-      delta[t] <- -1 * delta[t - 1]
-    } else {
-        delta[t] <- delta[t - 1]
-    }
-    
-    S[t] <- S[t - 1] + delta[t] * step
-    A <- X[t - 1,] %*% W + S[t] #the activation function (formula (1) in paper)
-    P[t,] <- 1 / (1 + exp(b - A)) #the probability function (formula (2) in paper)
-    X[t,] <- 1 * (P[t,] > runif(j)) #symptom i becomes active (=1) if the probability is greater than randomly chosen uniformly distributed number between 0 and 1
-  }
-  X <- X[-1:-100,]
-  S <- S[-1:-100]
-  delta <- delta[-1:-100]
-  
-  S <- 1 * S
-  s <- apply(X, 1, sum)
-  Sseq <- seq(-Smax, Smax, .2)
-  Sc <- cut(S, Sseq)
-  test <- tapply(s, list(Sc, delta), mean)
-  #plot(Sseq[26:100], test[c(26:100), 1], type = "b", col = 'black', axes = F, ann = F)
-  #lines(Sseq[26:100], test[26:100, 2], type = "b", col = 'grey', ann = F)
-  
-  if(c == 2) {
-    mtext("Stress", side = 1, line = 3, col = "black", adj = 0.5)  
-    axis(side = 1, c(-10, -5, 0, 5))
-  }
-  if (c == 1) {
-    axis(side = 2, c(0, 7, 14))
-  } else {
-      axis(side = 2, at = c(0, 7, 14), labels = F)
-  }
-  
-  if(c == 1) {
-    sdata <- cbind(S, s) 
-    } else {
-      sdata <- cbind(sdata, s)
-    }
-  
-  if(c == 1) {
-    mdata <- cbind(Sseq[-1], tapply(s, list(Sc, delta), mean))
-    } else {
-      mdata <- cbind(mdata, tapply(s, list(Sc, delta), mean))
-  }
-  return()
-}
-
-stress(data = md_data, c = 1.2, n = 10)

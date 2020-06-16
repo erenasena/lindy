@@ -153,17 +153,17 @@ f <- function(i){ # specify the desired function and parameter values here
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 100, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 100, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 10000)
+e <- events(x = res, nsim = 100, n = 10000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -192,13 +192,14 @@ plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "M
 mean <- mean(data$time)
 sd <- sd(data$time)
 quantile(data$time) 
-ext <- data$time[which(data$time > 325)] # the extreme values 
+ext <- data$time[which(data$time > 500)] # the extreme values 
 length(ext) / length(data$time) # what proportion of data are larger than a certain value 
 sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$time, breaks = 100, xlim = c(0, 750), main = 'GBM with an absorbing barrier')
-legend(x = "center", legend = c('mu = -1', 'sigma = 1', 'L = 90', 'R = -100'))
+hist(data$time, breaks = 100, xlim = c(0, 10000), main = 'GBM with an absorbing barrier')
+legend(x = "center", legend = c('c = 0.8:1.3', 'delta = 0.1', 'threshold = 5', 
+                                't = 10000', 'nsim = 1000'))
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
 hittings <- sort(data$time) # sort the data
@@ -219,8 +220,8 @@ logs <- log(s) # the log of the survival function
 logx <- log(hittings) # the log of the sorted failure times 
 
 plot(x = logx, y = logs, xlab = "log(failure times)", ylab = "log(survival function)", main = "The Zipf Plot") 
-legend(x = "center", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
-
+legend(x = "bottomleft", legend = c('c = 0.8:1.3', 'delta = 0.1', 'threshold = 5', 
+                                't = 10000', 'nsim = 1000'))                              
 zipfplot <- function (data, type = "plot", title = TRUE){
   # type should be equal to ’points’ if you want to add the
   # Zipf Plot to an existing graph
@@ -360,12 +361,13 @@ zengaplot <- function(data){
 }
 
 zengaplot(data = data$time)
-legend(x = "center", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
+legend(x = "center", legend = c('c = c(0.85, 1.3, 1.25)', 'delta = 0.01', 'threshold = 5', 
+                                't = 10000', 'nsim = 1000'))
 
-# Fit a distribution with various method
+# Fit a distribution with various methods
 fitdistrplus::fitdist(data = data$time, distr = "lnorm", method = "mle") # parameter est. 
-ks.test(x = data$time, y = lnorm)
-lnorm <- rlnorm(n = 100, 0.6049935, 1.6917828) # trying to see if matches the other graphs
+ks.test(x = data$time, y = "plnorm", 'meanlog' = 1.733794, 'sdlog' = 2.346450)
+lnorm <- rlnorm(n = 100, 1.733794, 2.346450) # trying to see if matches the other graphs
 
 ### Survival analysis 
 surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:length(data$time), ""))
@@ -383,7 +385,7 @@ hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate
                     xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 10, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 100, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
