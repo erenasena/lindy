@@ -148,22 +148,22 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 100, n = 1000) # indexing the BM values 
+v <- values(x = res, nsim = 1000, n = 10000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 100, n = 1000) # indexing the hitting times 
+t <- times(x = res, nsim = 1000, n = 10000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 100, n = 10000)
+e <- events(x = res, nsim = 1000, n = 10000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -198,8 +198,7 @@ sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
 hist(data$time, breaks = 100, xlim = c(0, 10000), main = 'GBM with an absorbing barrier')
-legend(x = "center", legend = c('c = 0.8:1.3', 'delta = 0.1', 'threshold = 5', 
-                                't = 10000', 'nsim = 1000'))
+legend(x = "center", legend = c('n = 10000', 'nsim = 1000', 'mu = -1', 'sigma = 1', 'X0 = 100', 'L = 90'))
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
 hittings <- sort(data$time) # sort the data
@@ -385,7 +384,7 @@ hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate
                     xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
 
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 100, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images

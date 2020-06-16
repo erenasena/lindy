@@ -119,7 +119,7 @@ states <- paste0("states", 1:t, "") # total number of active symptoms in each ti
 states <- matrix(data = unlist(results)[which(names(unlist(results)) == states)], nrow = nsim, ncol = t, byrow = TRUE)
 dimnames(x = states) <- list(paste0("Network", 1:nsim, ""), paste0("t", 1:t, ""))
 data <- as.data.frame(survnet(X = states, threshold = threshold)) # transition times
-hist(data$time, breaks = 15, xlab = 'Time', main = 'Time distribution of transitions')
+hist(data$time, breaks = 100, xlab = 'Time', main = 'Time distribution of transitions')
                                 
 # The symptom states
 symptom <- matrix(data = NA, nrow = t, ncol = ncol(md_data))
