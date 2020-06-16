@@ -148,22 +148,22 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
+  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 1000, n = 10000) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 10000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 1000, n = 10000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 10000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 1000, n = 10000)
+e <- events(x = res, nsim = 10000, n = 10000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -186,7 +186,10 @@ ms <- function(x, p){ # x is the hitting times vector, p is the moment for which
 }
 
 ratio <- ms(x = data$time, p = 4) # if kurtosis is defined, the rest is defined also 
-plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "Max / sum ratio")
+plot(x = ratio$n, y = ratio$MS, type = 'l', xlab = "Number of values", ylab = "Max / sum ratio", 
+     main = 'The maximum to sum plot of 
+     standard Brownian motion failure times', bty = 'n', col = 'red')
+legend(x = "center", legend = c('10,000 pathways', '10,000 time points', 'p = 4 (kurtosis)'), bty = 'n')
 
 # Descriptive statistics of the hitting times; moments are defined so we can get mean and sd 
 mean <- mean(data$time)
@@ -197,8 +200,10 @@ length(ext) / length(data$time) # what proportion of data are larger than a cert
 sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$time, breaks = 100, xlim = c(0, 10000), main = 'GBM with an absorbing barrier')
-legend(x = "center", legend = c('n = 10000', 'nsim = 1000', 'mu = -1', 'sigma = 1', 'X0 = 100', 'L = 90'))
+hist(data$time, breaks = 100, xlim = c(0, 10000), main = 'Standard Brownian motion 
+     with an absorbing barrier')
+legend(x = "center", legend = c('10,000 pathways', '10,000 time points', 'drift = -1', 'diffusion = 1', 
+                                'initial value = 100', 'absorbing barrier = -0.1'), bty = 'n')
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
 hittings <- sort(data$time) # sort the data
@@ -209,7 +214,8 @@ qqplot(x = s, y = q, xlab = "Sample quantiles", ylab = "Theoretical quantiles",
        main = "Exponential QQ Plot")
 
 qqPlot(x = data$time, y = "exponential", xlab = "Sample quantiles", 
-       ylab = "Theoretical quantiles", main = "Exponential Q-Q Plot") # shorter way with confidence bands
+       ylab = "Theoretical quantiles", main = "Exponential Q-Q Plot of
+       Standard Brownian Motion failure times", bty = 'n') # shorter way with confidence bands
 
 # Zipf / log-log plot to check for power law decay (linearity indicates power law)
 hittings <- sort(data$time) # sort the data
@@ -218,7 +224,8 @@ s <- 1 - fit(hittings) # empirical survival function
 logs <- log(s) # the log of the survival function 
 logx <- log(hittings) # the log of the sorted failure times 
 
-plot(x = logx, y = logs, xlab = "log(failure times)", ylab = "log(survival function)", main = "The Zipf Plot") 
+plot(x = logx, y = logs, xlab = "log(failure times)", ylab = "log(survival function)", 
+     main = "The Zipf Plot of Standard Brownian Motion failure times", bty = 'n') 
 legend(x = "bottomleft", legend = c('c = 0.8:1.3', 'delta = 0.1', 'threshold = 5', 
                                 't = 10000', 'nsim = 1000'))                              
 zipfplot <- function (data, type = "plot", title = TRUE){
@@ -235,10 +242,10 @@ zipfplot <- function (data, type = "plot", title = TRUE){
            ylab = "1-F(x) on log scale")
     }
   else if(title==F){
-    plot(data, y, log="xy", xlab = "x on log scale", ylab = "1-F(x) on log scale")
+    plot(data, y, log = "xy", xlab = "x on log scale", ylab = "1-F(x) on log scale")
     }
   else{
-    plot(data, y, log="xy", xlab = "x on log scale", ylab = "1-F(x) on log scale", main="Zipf Plot")
+    plot(data, y, log = "xy", xlab = "x on log scale", ylab = "1-F(x) on log scale", main = "Zipf Plot")
     }
 }
 
@@ -246,7 +253,8 @@ zipfplot(data = data$time)
 
 # Mean excess (ME) plot (linearity indicates power law, concavity lognorm, constant exp, decreasing norm)
 evir::meplot(sort(data$time)) 
-VGAM::meplot(sort(data$time)) # gives confidence bands
+VGAM::meplot(sort(data$time), main = 'The Mean Excess Plot of
+             Standard Brownian Motion failure times', bty = 'n') # gives confidence bands
 legend(x = "bottomleft", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
 meplot <- function(data, cut = 5){
@@ -356,7 +364,8 @@ zengaplot <- function(data){
   # graphical reasons
   Zu[1] <- Zu[2]; Zu[length(Zu)] <- Zu[(length(Zu)-1)]
   # Here’s the plot
-  plot(est$p, Zu, xlab = "u", ylab = "Z(u)", ylim = c(0, 1), main = "Zenga plot", "l", lty = 1)
+  plot(est$p, Zu, xlab = "u", ylab = "Z(u)", ylim = c(0, 1), 
+       main = 'Zenga plot of Standard Brownian Motion failure times', "l", lty = 1)
 }
 
 zengaplot(data = data$time)
@@ -365,8 +374,8 @@ legend(x = "center", legend = c('c = c(0.85, 1.3, 1.25)', 'delta = 0.01', 'thres
 
 # Fit a distribution with various methods
 fitdistrplus::fitdist(data = data$time, distr = "lnorm", method = "mle") # parameter est. 
-ks.test(x = data$time, y = "plnorm", 'meanlog' = 1.733794, 'sdlog' = 2.346450)
-lnorm <- rlnorm(n = 100, 1.733794, 2.346450) # trying to see if matches the other graphs
+ks.test(x = data$time, y = lnorm)
+lnorm <- rlnorm(n = 10000, 5.843169, 1.760908) # trying to see if matches the other graphs
 
 ### Survival analysis 
 surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:length(data$time), ""))
@@ -381,7 +390,11 @@ hazard <- haz_fit$hazard
 haz_time <- haz_fit$time
 
 hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
-                    xlim = c(min(haz_time), max(haz_time)), ylim = c(min(haz_fit$haz), max(haz_fit$haz)))
+                    xlim = c(min(haz_time), max(haz_time)), 
+                    ylim = c(min(haz_fit$haz), max(haz_fit$haz)), bty = 'n', main = 'The hazard function of
+                    Standard Brownian motion failure times')
+legend(x = "topright", legend = c('10,000 sample paths', '10,000 time points', 
+                                  'initial value = 0', 'drift = 0', 'diffusion = 1'), bty = 'n')
 
 ## Conditional survival
 fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
@@ -389,8 +402,10 @@ con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
 plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time', 
-     ylab = 'Probability', main = 'Conditional survival and death over time',
-     ylim = c(0, 1), xlim = c(min(con_time), max(con_time)))
+     ylab = 'Probability', main = 'Conditional survival and death of Standard Brownian Motion 
+     sample paths over time',
+     ylim = c(0, 1), xlim = c(min(con_time), max(con_time)), bty = 'n')
 lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
+legend(x = 'right', legend = 'window width = 1000', bty = 'n')
 cond <- data.frame(con_time, con_surv, con_death)
 colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')

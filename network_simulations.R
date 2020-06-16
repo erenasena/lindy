@@ -30,15 +30,15 @@ lindynet <- function(data, t) { # data must be a matrix
   P <- X <- matrix(data = 0, nrow = t, ncol = j) # matrix with probabilities (P) and simulated data (X): initially 0s. 
   c <- sample(x = connectivity, size = 1, replace = FALSE) # the connectivity parameter is random for each network
   W <- c * W 
-  s <- sample(x = stress, size = 1, replace = FALSE)
-  stime <- sample(x = time, size = 1)
+  stime <- sample(x = time, size = 1) # a randomly sampled time point 
     
   for (t in 2:t) { 
     if(t == stime) { # if the network is at the randomly sampled time point, 
-      A <- X[t - 1,] %*% W + s # hit the network with a randomly sampled stress parameter
+      s <- sample(x = stress, size = 1, replace = FALSE) # hit the network with a randomly sampled stress parameter
     } else {
-      A <- X[t - 1,] %*% W 
+      s <- 0 
     }
+    A <- X[t - 1,] %*% W + s 
     P[t,] <- 1 / (1 + exp(b - A)) # the probability function (formula (2) in paper)
     X[t,] <- 1 * (P[t,] > runif(j)) # symptom i becomes active ( = 1) if the probability is greater 
                                     # than randomly chosen uniformly distributed number between 0 & 1
@@ -119,7 +119,7 @@ states <- paste0("states", 1:t, "") # total number of active symptoms in each ti
 states <- matrix(data = unlist(results)[which(names(unlist(results)) == states)], nrow = nsim, ncol = t, byrow = TRUE)
 dimnames(x = states) <- list(paste0("Network", 1:nsim, ""), paste0("t", 1:t, ""))
 data <- as.data.frame(survnet(X = states, threshold = threshold)) # transition times
-hist(data$time, breaks = 100, xlab = 'Time', main = 'Time distribution of transitions')
+hist(data$time, breaks = 25, xlab = 'Time', main = 'Time distribution of transitions')
                                 
 # The symptom states
 symptom <- matrix(data = NA, nrow = t, ncol = ncol(md_data))
