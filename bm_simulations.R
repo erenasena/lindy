@@ -148,22 +148,22 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  #my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
-  my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 11000000000) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
 }
 
 set.seed(1)
-res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:1000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 10000) # indexing the BM values 
+v <- values(x = res, nsim = 1000, n = 10000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 10000) # indexing the hitting times 
+t <- times(x = res, nsim = 1000, n = 10000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 10000)
+e <- events(x = res, nsim = 1000, n = 10000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
@@ -392,20 +392,22 @@ haz_time <- haz_fit$time
 hazard_plot <- plot(x = haz_time, y = hazard, xlab = 'Time', ylab = 'Hazard Rate', type = 'l', 
                     xlim = c(min(haz_time), max(haz_time)), 
                     ylim = c(min(haz_fit$haz), max(haz_fit$haz)), bty = 'n', main = 'The hazard function of
-                    Standard Brownian motion failure times')
-legend(x = "topright", legend = c('10,000 sample paths', '10,000 time points', 
-                                  'initial value = 0', 'drift = 0', 'diffusion = 1'), bty = 'n')
+                    MDD networks over time')
+legend(x = "topright", legend = c('1000 networks', '10,000 time points', 
+                               'threshold = 5', 'Min. stress = 1', 'Max. stress = 15',
+                               'delta stress = 1', 'Min. conn. = 0.90', 'Max. conn. = 1.05', 
+                               'delta conn. = 0.00015'), bty = 'n')
+
 
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 7, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
 plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time', 
-     ylab = 'Probability', main = 'Conditional survival and death of Standard Brownian Motion 
-     sample paths over time',
-     ylim = c(0, 1), xlim = c(min(con_time), max(con_time)), bty = 'n')
+     ylab = 'Probability', main = 'Conditional survival and death of MDD networks over time',
+     ylim = c(0, 1), xlim = c(0, 70), bty = 'n')
 lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
-legend(x = 'right', legend = 'window width = 1000', bty = 'n')
+legend(x = 'topleft', legend = 'window width = 7', bty = 'n')
 cond <- data.frame(con_time, con_surv, con_death)
 colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
