@@ -398,15 +398,14 @@ legend(x = "topright", legend = c('1000 networks', '10,000 time points',
                                'delta stress = 1', 'Min. conn. = 0.90', 'Max. conn. = 1.05', 
                                'delta conn. = 0.00015'), bty = 'n')
 
-
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 7, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
 con_time <- fit$time # the calculated times
 con_death <- fit$Fw # conditional death 
 con_surv <- 1 - con_death # conditional survival; they are mirror images
 plot(x = con_time, y = con_surv, type = 'l', col = 'green', xlab = 'Time', 
      ylab = 'Probability', main = 'Conditional survival and death of MDD networks over time',
-     ylim = c(0, 1), xlim = c(0, 70), bty = 'n')
+     ylim = c(0, 1), xlim = c(0, 10000), bty = 'n')
 lines(con_time, con_death, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
 legend(x = 'topleft', legend = 'window width = 7', bty = 'n')
 cond <- data.frame(con_time, con_surv, con_death)
