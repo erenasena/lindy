@@ -1,13 +1,15 @@
-# bm-simulations
+# The Lindy Effect in Psychology 
+
+## Brownian motion simulations
 
 <p align="center">
   <img width="460" height="300" src="https://upload.wikimedia.org/wikipedia/commons/c/c2/Brownian_motion_large.gif">
 </p>
 
-## Simulations
+### The simulations
 - **Standard** Brownian Motion
-- **Arithmetic** Brownian Motion (with drift and absorbing barrier)
-- Geometric Brownian Motion (with ***absorbing barrier***)
+- **Arithmetic** Brownian Motion (with **drift**, absorbing barrier)
+- **Geometric** Brownian Motion (with ***absorbing barrier*** and **reflecting barrier**)
 
 ## Running Docker Container
 To keep simulations reproducible it is recommended they be run inside a Docker container. 
