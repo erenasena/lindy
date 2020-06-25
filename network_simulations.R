@@ -9,6 +9,7 @@ md_data <- data.matrix(read.table("md_data.txt", header = F))
 colnames(md_data) <- c("dep.mood", "loss.int", "w.loss", "w.gain", "dec.app", "inc.app", "insomnia", 
                        "hypsomnia", "psycm.agit", "psycm.ret", "fatigue", "worth", "conc.prob", "death")
 
+
 ################## The Functions ################## 
 # This function computes the total number of active symptoms at each time point for n networks. 
 lindynet <- function(data, t, C, c1, c2, dc, s1, s2, ds) { # data must be a matrix 
@@ -88,13 +89,13 @@ detectCores() # tells you the number of cores your computer can use for the simu
 
 ## Set up the parameters
 data <- md_data
-nsim <- 2
-t <- 10 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
+nsim <- 1000
+t <- 10000 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
 
 C <- T
-c1 <- 1.15 # 1.15 and 1.1 gives good results; smaller and we don't have enough medium values, everything fails
-c2 <- 1.30 # 1.25 - 1.30; smaller and we don't have enough large values, bigger and nothing fails 
-dc <- 0.00015 # smaller values are better 
+c1 <- 0.15 # 1.15 and 1.1 gives good results; smaller and we don't have enough medium values, everything fails
+c2 <- 1.25 # 1.25 - 1.30; smaller and we don't have enough large values, bigger and nothing fails 
+dc <- 0.00010 # smaller values are better 
 
 s1 <- 1 # 1 - 5; the lower end gives more barely depressed networks, 5 starts everything at 14 
 s2 <- 15 # not sure about this one 
@@ -123,13 +124,10 @@ nrow(states) / nsim # the proportion of networks kept
 connectivity <- unlist(results)[which(names(unlist(results)) == "connectivity")]
 
 # Create the data frame for survival analysis
-data <- as.data.frame(cbind(survnet(X = states, threshold = threshold), connectivity))
-
-hist(data$time, breaks = 25, xlab = 'Time', main = 'Time distribution of transitions')
-legend(x = "right", legend = c('1000 networks', '10,000 time points', 
-                                  'threshold = 5', 'Min. stress = 1', 'Max. stress = 15',
-                                  'delta stress = 1', 'Min. conn. = 0.90', 'Max. conn. = 1.05', 
-                                  'delta conn. = 0.00015'), bty = 'n')
+data <- as.data.frame(cbind(survnet(X = states, threshold = threshold)))
+#data <- as.data.frame(cbind(survnet(X = states, threshold = threshold), connectivity))
+hist(newnet$time, breaks = 50, xlab = 'Time', main = 'The frequency distribution of state transitions', 
+     col = "lightblue", border = 'darkblue')
 
 plot(data$connectivity, data$time, xlab = "Connectivity", ylab = "Time", 
      main = "The relationship between 
@@ -222,6 +220,6 @@ conc_events <- cbind(data$events[,'conc.prob'])
 insom_times <- cbind(data$times[,'insomnia'])
 insom_events <- cbind(data$events[,'insomnia'])
 
-hist(dep_times, breaks = 25, main = "Failure time distribution of loss of interest", xlab = "Time")
+hist(lossint_times, breaks = 25, main = "Failure time distribution of loss of interest", xlab = "Time")
 legend(x = "center", legend = c(paste("c", "=", c), paste("time", "=", t), paste("nsim", "=", nsim)))
-data <- data.frame('time' = dep_times, 'event' = dep_event)
+data <- data.frame('time' = lossint_times, 'event' = lossint_event)
