@@ -153,8 +153,8 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 110) 
-  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 0, mu = 0, sigma = 1, L = -0.1, R = 10000000)
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 1100000000) 
+  #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.85, R = 10000000)
 }
 
 set.seed(1)
@@ -176,13 +176,15 @@ data <- cbind(df_times, df_event)
 
 # Data 
 std <- readRDS(file = 'std') # standard brownian motion 
+abm1 <- readRDS(file = 'abm1')
 gbm1 <- readRDS(file = 'gbm1') # gbm with abs but no ref 
 gbm2 <- readRDS(file = 'gbm2') # gbm with both barriers
 highnets <- readRDS(file = 'networks') # networks with high connectivity 
 lownets <- readRDS(file = 'lownets') # networks with low connectivity 
 
-data <- highnets$time
-
+data <- lownets
+length(which(data$time == 1)) / length(data$time)
+which(data$time > 70)
 ### Distribution fitting 
 
 ### Visualizations
@@ -207,7 +209,7 @@ bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of t
   return(p)
 }
 
-bmplot(x = m_val[1:1000,], nsim = 1000, n = 10000, L = 90, R = 110, 
+bmplot(x = , nsim = 1000, n = 10000, L = 90, R = 110, 
        ylim = c(min(m_val), max(m_val)), title = "Geometric Brownian motion with an absorbing 
        and a reflecting barrier")
 
@@ -242,7 +244,7 @@ length(ext) / length(data$time) # what proportion of data are larger than a cert
 sum(ext) / sum(data$time) # what proportion of the sum they make
 
 # Histogram of the hitting times
-hist(data$time, breaks = 100, xlim = c(0, 10000), main = 'Geometric Brownian motion 
+hist(data$time, breaks = 10, xlim = c(0, 10000), main = 'Geometric Brownian motion 
      with absorbing and reflecting barriers', xlab = "Time", col = "lightblue", border = "darkblue", prob = F)
 
 # Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
@@ -289,11 +291,11 @@ zipfplot <- function (data, type = "plot", title = TRUE){
     }
 }
 
-zipfplot(data = data$time)
+zipfplot(data = gbm1$time)
 
 # Mean excess (ME) plot (linearity indicates power law, concavity lognorm, constant exp, decreasing norm)
 evir::meplot(sort(data$time)) 
-VGAM::meplot(sort(data$time), main = 'The Mean Excess Plot of
+VGAM::meplot(sort(std$time), main = 'The Mean Excess Plot of
              weakly connected networks', bty = 'n') # gives confidence bands
 legend(x = "bottomleft", legend = c('c = 1.225', 'n = 10000', 'nsim = 1000'))
 
@@ -423,8 +425,9 @@ haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
 survival <- surv_fit$surv
 surv_time <- surv_fit$time
 
-plot(x = haz_fit$time, y = haz_fit$hazard, xlab = "Time", ylab = "Hazard", 
-     type = 'l', bty = 'n', main = 'Hazard function of depressed networks')
+plot(x = haz_fit$time, y = haz_fit$hazard, xlab = "Time", 
+     ylab = "Hazard", ylim = c(min(haz_fit$hazard), max(haz_fit$hazard)),
+     type = 'l', bty = 'n', main = 'Hazard function of highly connected MDD networks', col = 'blue')
 
 ## Conditional survival
 fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
@@ -432,10 +435,10 @@ condeath <- fit$Fw
 consurv <- 1 - condeath
 plot(x = fit$time, y = consurv, type = 'l', col = 'green', xlab = 'Time', 
      ylab = 'Conditional Probability', main = 'Conditional survival and death
-     probabilities of network states',
+     probabilities of highly connected MDD networks',
      ylim = c(0, 1), xlim = c(0, 10000), bty = 'n')
 lines(x = fit$time, y = condeath, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
-legend(x = 'center', bty = 'n', lty = c(1, 1), 
+legend(x = 'bottom', bty = 'n', lty = c(1, 1), 
        col = c("green", "red"), 
        legend = c("Conditional survival", "Conditional death"))
 

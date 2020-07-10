@@ -90,12 +90,12 @@ detectCores() # tells you the number of cores your computer can use for the simu
 ## Set up the parameters
 data <- md_data
 nsim <- 1000
-t <- 10000 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
+t <- 100 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
 
 C <- T
-c1 <- 0.15 # 1.15 and 1.1 gives good results; smaller and we don't have enough medium values, everything fails
-c2 <- 1.25 # 1.25 - 1.30; smaller and we don't have enough large values, bigger and nothing fails 
-dc <- 0.00010 # smaller values are better 
+c1 <- 1.00 # 1.15 and 1.1 gives good results; smaller and we don't have enough medium values, everything fails
+c2 <- 1.15 # 1.25 - 1.30; smaller and we don't have enough large values, bigger and nothing fails 
+dc <- 0.00015 # smaller values are better 
 
 s1 <- 1 # 1 - 5; the lower end gives more barely depressed networks, 5 starts everything at 14 
 s2 <- 15 # not sure about this one 
@@ -126,7 +126,7 @@ connectivity <- unlist(results)[which(names(unlist(results)) == "connectivity")]
 # Create the data frame for survival analysis
 data <- as.data.frame(cbind(survnet(X = states, threshold = threshold)))
 #data <- as.data.frame(cbind(survnet(X = states, threshold = threshold), connectivity))
-hist(newnet$time, breaks = 50, xlab = 'Time', main = 'The frequency distribution of state transitions', 
+hist(data$time, breaks = 10, xlab = 'Time', main = 'The frequency distribution of state transitions', 
      col = "lightblue", border = 'darkblue')
 
 plot(data$connectivity, data$time, xlab = "Connectivity", ylab = "Time", 
