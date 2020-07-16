@@ -4,7 +4,7 @@
 # 3-Computing hazard functions and conditional survival (the Lindy effect) 
 
 ### The necessary libraries
-library(dplyr) # don't know why 
+library(dplyr)
 library(parallel) # to run the parallel simulations 
 library(ggplot2) # to plot the Brownian motion simulations
 library(reshape) # for visualizations
