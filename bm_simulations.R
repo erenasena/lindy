@@ -40,10 +40,10 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # nsim is the number of
     for(j in 2:length(time)){
       X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
       
-      while(X[i,j] < R){ # simulate data as long as it's below the reflecting barrier 
+      while(X[i,j] > R){ # simulate data as long as it's above the reflecting barrier 
         X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
         
-        if(X[i,j] >= R){ # if we are equal or above, the value stays the same
+        if(X[i,j] <= R){ # if we are equal or below, the value stays the same
         X[i,j] <- X[i,j]
         }
       }
