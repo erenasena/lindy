@@ -4,7 +4,11 @@
 # 3-Computing hazard functions and conditional survival (the Lindy effect) 
 
 ### The necessary libraries
-library(dplyr) # don't know why 
+<<<<<<< HEAD
+library(dplyr) 
+=======
+library(dplyr)
+>>>>>>> 1b69223ccc790d341dcc4d362bc28d2a4ff2f76a
 library(parallel) # to run the parallel simulations 
 library(ggplot2) # to plot the Brownian motion simulations
 library(reshape) # for visualizations
@@ -22,9 +26,13 @@ library(statmod) # to generate inverse Gaussian values
 ### The Brownian motion functions 
 
 ## Arithmetic Brownian Motion (resamples until the value is below the reflecting barrier)  
-my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
+my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # nsim is the number of sample paths 
+                                                         # t0 is the first time point (e.g., 0)
+                                                         # t is the final time point (e.g., 1)
+                                                         # n is the number of time intervals that divide t0-t
+                                                         # mu = drift, sigma = diffusion, L = absorb. barrier, R = reflecting barrier 
   
-  dt <- t/n 
+  dt <- t/n # the size of the time intervals, also the variance of BM increments 
   time <- seq(from = t0, to = t, by = dt)   
   initial <- X0  
   X <- matrix(nrow = nsim, ncol = length(time)) 
@@ -36,10 +44,10 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
     for(j in 2:length(time)){
       X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
       
-      while(X[i,j] > R){ # simulate data as long as it's above the reflecting barrier 
+      while(X[i,j] < R){ # simulate data as long as it's below the reflecting barrier 
         X[i,j] <- X0 + mu * dt + sigma * sqrt(dt) * rnorm(n = 1, mean = 0, sd = 1)
         
-        if(X[i,j] <= R) { # if we are below or equal, the value stays the same
+        if(X[i,j] >= R){ # if we are equal or above, the value stays the same
         X[i,j] <- X[i,j]
         }
       }
@@ -153,38 +161,38 @@ events <- function(x, nsim, n){
 
 ## Parallel runs 
 f <- function(i){ # specify the desired function and parameter values here
-  my_gbm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 1100000000) 
+  my_gbm(nsim = 1, t0 = 0, t = 1, n = 1000, X0 = 100, mu = -1, sigma = 1, L = 90, R = 1100000000) 
   #my_abm(nsim = 1, t0 = 0, t = 1, n = 10000, X0 = 1, mu = -1, sigma = 1, L = 0.85, R = 10000000)
 }
 
 set.seed(1)
 res <- mclapply(X = 1:10000, f, mc.cores = 8, mc.set.seed = TRUE)
 
-v <- values(x = res, nsim = 10000, n = 10000) # indexing the BM values 
+v <- values(x = res, nsim = 10000, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
 df_val <- v[[2]] # BM values in a data frame
 
-t <- times(x = res, nsim = 10000, n = 10000) # indexing the hitting times 
+t <- times(x = res, nsim = 10000, n = 1000) # indexing the hitting times 
 m_times <- t[[1]] # in a matrix (for histograms)
 df_times <- t[[2]] # in a data frame 
 
-e <- events(x = res, nsim = 10000, n = 10000)
+e <- events(x = res, nsim = 10000, n = 1000)
 m_event <- e[[1]] 
 df_event <- e[[2]]
 
 data <- cbind(df_times, df_event)
 
 # Data 
-std <- readRDS(file = 'std') # standard brownian motion 
-abm1 <- readRDS(file = 'abm1')
-gbm1 <- readRDS(file = 'gbm1') # gbm with abs but no ref 
-gbm2 <- readRDS(file = 'gbm2') # gbm with both barriers
-highnets <- readRDS(file = 'networks') # networks with high connectivity 
-lownets <- readRDS(file = 'lownets') # networks with low connectivity 
+#std <- readRDS(file = 'std') # standard brownian motion 
+#abm1 <- readRDS(file = 'abm1')
+#gbm1 <- readRDS(file = 'gbm1') # gbm with abs but no ref 
+#gbm2 <- readRDS(file = 'gbm2') # gbm with both barriers
+#highnets <- readRDS(file = 'networks') # networks with high connectivity 
+#lownets <- readRDS(file = 'lownets') # networks with low connectivity 
 
-data <- lownets
-length(which(data$time == 1)) / length(data$time)
-which(data$time > 70)
+#data <- lownets
+#length(which(data$time == 1)) / length(data$time)
+#which(data$time > 70)
 ### Distribution fitting 
 
 ### Visualizations
@@ -209,9 +217,8 @@ bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of t
   return(p)
 }
 
-bmplot(x = , nsim = 1000, n = 10000, L = 90, R = 110, 
-       ylim = c(min(m_val), max(m_val)), title = "Geometric Brownian motion with an absorbing 
-       and a reflecting barrier")
+bmplot(x = m_val, nsim = 10000, n = 1000, L = 90, R = 1000, 
+       ylim = c(min(m_val), max(m_val)), title = "Geometric Brownian motion with an absorbing")
 
 ### Describing the hitting time distribution
 
@@ -427,20 +434,20 @@ surv_time <- surv_fit$time
 
 plot(x = haz_fit$time, y = haz_fit$hazard, xlab = "Time", 
      ylab = "Hazard", ylim = c(min(haz_fit$hazard), max(haz_fit$hazard)),
-     type = 'l', bty = 'n', main = 'Hazard function of highly connected MDD networks', col = 'blue')
+     type = 'l', bty = 'n', main = 'Hazard function of GBM stopping times', col = 'blue')
 
 ## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 1000, variance = TRUE, conf.level = 0.95)
+fit <- dynpred::Fwindow(object = surv_fit, width = 100, variance = TRUE, conf.level = 0.95)
 condeath <- fit$Fw
 consurv <- 1 - condeath
 plot(x = fit$time, y = consurv, type = 'l', col = 'green', xlab = 'Time', 
      ylab = 'Conditional Probability', main = 'Conditional survival and death
-     probabilities of highly connected MDD networks',
-     ylim = c(0, 1), xlim = c(0, 10000), bty = 'n')
+     probabilities of GBM stopping times',
+     ylim = c(0, 1), xlim = c(0, 1000), bty = 'n')
 lines(x = fit$time, y = condeath, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
 legend(x = 'bottom', bty = 'n', lty = c(1, 1), 
        col = c("green", "red"), 
        legend = c("Conditional survival", "Conditional death"))
 
-cond <- data.frame(con_time, con_surv, con_death)
-colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
+#cond <- data.frame(con_time, con_surv, con_death)
+#colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
