@@ -133,7 +133,7 @@ plot(data$connectivity, data$time, xlab = "Connectivity", ylab = "Time",
      main = "The relationship between 
      connectivity and duration of a state", bty = 'n', pch = 19)
 
-### Miscellaneous functions
+################## Irrelevant stuff################## 
 
 # The symptom states
 symptom <- matrix(data = NA, nrow = t, ncol = ncol(md_data))
