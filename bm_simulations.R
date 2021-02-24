@@ -1,23 +1,8 @@
-### Outline: 
-# 1-Brownian motion simulations
-# 2-Describing the hitting time distributions
-# 3-Computing hazard functions and conditional survival (the Lindy effect) 
-
-### The necessary libraries
+### Libraries
 library(dplyr)
 library(parallel) # to run the parallel simulations 
 library(ggplot2) # to plot the Brownian motion simulations
 library(reshape) # for visualizations
-library(survival) # survival analysis
-library(survminer) # to plot the survival curves 
-library(dynpred) # to compute conditional survival 
-library(qualityTools) # for the Q-Q plots 
-library(evir) # for the mean excess plot 
-library(ineq) # for the Zenga plot 
-library(fitdistrplus) # to fit distributions
-library(logspline) # to test K-S hypothesis
-library(actuar)
-library(statmod) # to work with inverse Gaussian values 
 
 ### The Brownian motion functions 
 
@@ -68,7 +53,6 @@ my_abm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ # nsim is the number of
   }
     return(values)
 }
-
 
 ## Geometric Brownian Motion (the new value equals the reflecting barrier until it is below it)
 my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){ 
@@ -237,133 +221,27 @@ invisible(lapply(2:100, function(i) lines(x = time, y = babm[i, ], col = cl[i], 
 abline(h = B, col = "red") # add the absorbing barrier
 dev.off()
 
-# Data 
-#std <- readRDS(file = 'std') # standard Brownian motion 
-#abm1 <- readRDS(file = 'abm1')
-#gbm1 <- readRDS(file = 'gbm1') # gbm with abs but no ref 
-#gbm2 <- readRDS(file = 'gbm2') # gbm with both barriers
-#highnets <- readRDS(file = 'networks') # networks with high connectivity 
-#lownets <- readRDS(file = 'lownets') # networks with low connectivity 
-
-#data <- lownets
-#length(which(data$time == 1)) / length(data$time)
-#which(data$time > 70)
-### Distribution fitting 
-
-### Visualizations
-bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
-  rownames(x) <- paste("sim", seq(nsim), sep = "") # the number of simulations / rows
-  colnames(x) <- paste("time", seq(0:n), sep = "") # the number of time points - 0:100 at the moment / columns 
-  dat <- as.data.frame(x) # creating the data frame for ggplot 
-  dat$sim <- rownames(dat)
-  mdat <- melt(dat, id.vars = "sim")
-  mdat$time <- as.numeric(gsub("time", "", mdat$variable))
+### Old (ggplot) Visualizations
+#bmplot <- function(x, nsim, n, L, R, ylim, title){ # x is the matrix output of the BM functions, n is the number of simulations, t is the vector of time points, as in the BM functions 
+  #rownames(x) <- paste("sim", seq(nsim), sep = "") # the number of simulations / rows
+  #colnames(x) <- paste("time", seq(0:n), sep = "") # the number of time points - 0:100 at the moment / columns 
+  #dat <- as.data.frame(x) # creating the data frame for ggplot 
+  #dat$sim <- rownames(dat)
+  #mdat <- melt(dat, id.vars = "sim")
+  #mdat$time <- as.numeric(gsub("time", "", mdat$variable))
   
-  p <- ggplot(data = mdat, mapping = aes(x = time, y = value, group = sim)) +
-    theme_bw() +
-    theme(panel.grid = element_blank(), 
-          plot.title = element_text(hjust = 0.5),
-          axis.title.y = element_text(angle = 0, size = 11, margin = margin(t = 0, r = 10, b = 0, l = 0)), 
-          axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
-    geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
-    ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + 
-    geom_hline(yintercept = L, color = "orange", size = 0.5) +
-    geom_hline(yintercept = R, color = "green", size = 0.5)
-  return(p)
-}
+  #p <- ggplot(data = mdat, mapping = aes(x = time, y = value, group = sim)) +
+    #theme_bw() +
+    #theme(panel.grid = element_blank(), 
+          #plot.title = element_text(hjust = 0.5),
+          #axis.title.y = element_text(angle = 0, size = 11, margin = margin(t = 0, r = 10, b = 0, l = 0)), 
+          #axis.title.x = element_text(margin = margin(t = 10, b = 10))) +
+    #geom_line(size = 0.3, alpha = 1, aes(color = sim), show.legend = FALSE) + 
+    #ggtitle(title) + xlab("Time") + ylab("Value") + ylim(ylim) + 
+    #geom_hline(yintercept = L, color = "orange", size = 0.5) +
+    #geom_hline(yintercept = R, color = "green", size = 0.5)
+  #return(p)
+#}
 
-bmplot(x = abm, nsim = 1000, n = 10000, L = 100000, R = 100000, 
-       ylim = c(0, 1000), title = "Geometric Brownian motion with an absorbing")
-
-### Describing the distributions
-
-# Some distributions
-set.seed(12345)
-g <- rgamma(n = 100000, shape = 0.5, rate = 1)
-w <- rweibull(n = 100000, shape = 0.9, scale = 50)
-e <- rexp(n = 100000, 1)
-p <- rpareto(n = 100000, scale = 1, shape = 3)
-
-# Histogram of the hitting times
-hist(data$time, breaks = 10, xlim = c(0, 100000), main = 'Geometric Brownian motion 
-     with absorbing and reflecting barriers', xlab = "Time", col = "lightblue", border = "darkblue", prob = F)
-
-# Q-Q Plot to check exponentiality (if linear, thin tails, if concave, there may be heavy tailedness)
-#hittings <- sort(data$time) # sort the data
-hittings <- sort(w)
-p <- ppoints(hittings, length(hittings)) # get the probabilities of the data
-s <- quantile(x = hittings, p = p) # sample quantiles
-q <- qexp(p = p) # exponential quantiles 
-qqplot(x = s, y = q, xlab = "Sample quantiles", ylab = "Theoretical quantiles", 
-       main = "Exponential QQ Plot")
-
-# Zipf / log-log plot to check for power law decay (linearity indicates power law)
-hittings <- sort(data$time) # sort the data
-fit <- ecdf(hittings) # empirical cumulative distribution function
-s <- 1 - fit(hittings) # empirical survival function  
-logs <- log(s) # the log of the survival function 
-logx <- log(hittings) # the log of the sorted failure times 
-
-plot(x = logx, y = logs, xlab = "log(failure times)", ylab = "log(survival function)", 
-     main = "The Zipf Plot of the Weibull distribution", bty = 'n', xlim = c(min(logx), max(logx)))
-legend(x = "bottomleft", legend = c('c = 0.8:1.3', 'delta = 0.1', 'threshold = 5', 
-                                't = 10000', 'nsim = 1000')) 
-
-# The Zipf plot function of Cirillo 
-zipfplot <- function (data, type = "plot", title = TRUE){
-  # type should be equal to ’points’ if you want to add the
-  # Zipf Plot to an existing graph
-  # With other strings or no string a new graph is created.
-  # If title is set to be F, the title of the plot is not given.
-  # This can be useful when embedding the Zipf plot into other
-  # plots.
-  data <- sort(as.numeric(data)) #sorting data 
-  y <- 1 - ppoints(data) #computing 1-F(x)
-  if (type == "points") {
-    points(data, y, xlog = T, ylog = T, xlab = "x on log scale",
-           ylab = "1-F(x) on log scale")
-    }
-    plot(data, y, log = "xy", xlab = "x on log scale", ylab = "1-F(x) on log scale", 
-         main = "Zipf Plot of the Pareto Distribution", bty = "n")
-}
-
-zipfplot(data = g)
-
-png(filename = "zipfweibull")
-zipfplot(data = w)
-dev.off()
-
-png(filename = "zipfpareto")
-zipfplot(data = p)
-dev.off()
-
-### Survival analysis 
-
-## Create survival objects and fit hazards for all Brownian motions 
-surv_data <- data.frame(Time = data$time, Event = data$event, row.names = paste0("Sim", 1:length(data$time), ""))
-surv_object <- Surv(time = data$time, event = data$event) 
-surv_fit <- survfit(surv_object ~ 1, data = data, ctype = 1)
-haz_fit <- bshazard::bshazard(surv_object ~ 1, data = surv_data)
-
-survival <- surv_fit$surv
-surv_time <- surv_fit$time
-
-plot(x = haz_fit$time, y = haz_fit$hazard, xlab = "Time", 
-     ylab = "Hazard", ylim = c(min(haz_fit$hazard), max(haz_fit$hazard)),
-     type = 'l', bty = 'n', main = 'Hazard function of GBM stopping times', col = 'blue')
-
-## Conditional survival
-fit <- dynpred::Fwindow(object = surv_fit, width = 100, variance = TRUE, conf.level = 0.95)
-condeath <- fit$Fw
-consurv <- 1 - condeath
-plot(x = fit$time, y = consurv, type = 'l', col = 'green', xlab = 'Time', 
-     ylab = 'Conditional Probability', main = 'Conditional survival and death
-     probabilities of GBM stopping times',
-     ylim = c(0, 1), xlim = c(0, 1000), bty = 'n')
-lines(x = fit$time, y = condeath, col = 'red') # change the limit of the y-axis to c(0, 1) to see this 
-legend(x = 'bottom', bty = 'n', lty = c(1, 1), 
-       col = c("green", "red"), 
-       legend = c("Conditional survival", "Conditional death"))
-
-#cond <- data.frame(con_time, con_surv, con_death)
-#colnames(cond) <- c('Time', 'Conditional Survival', 'Conditional Death')
+#bmplot(x = abm, nsim = 1000, n = 10000, L = 100000, R = 100000, 
+       #ylim = c(0, 1000), title = "Geometric Brownian motion with an absorbing")

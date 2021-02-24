@@ -90,7 +90,7 @@ detectCores() # tells you the number of cores your computer can use for the simu
 ## Set up the parameters
 data <- md_data
 nsim <- 1000
-t <- 100 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
+t <- 10000 # 0-2000 time points ALWAYS show Lindy; actually 20%, even if everything has failed by 1000 points 
 
 C <- T
 c1 <- 1.00 # 1.15 and 1.1 gives good results; smaller and we don't have enough medium values, everything fails
@@ -122,104 +122,3 @@ nrow(states) / nsim # the proportion of networks kept
 
 # The network connectivity levels 
 connectivity <- unlist(results)[which(names(unlist(results)) == "connectivity")]
-
-# Create the data frame for survival analysis
-data <- as.data.frame(cbind(survnet(X = states, threshold = threshold)))
-#data <- as.data.frame(cbind(survnet(X = states, threshold = threshold), connectivity))
-hist(data$time, breaks = 10, xlab = 'Time', main = 'The frequency distribution of state transitions', 
-     col = "lightblue", border = 'darkblue')
-
-plot(data$connectivity, data$time, xlab = "Connectivity", ylab = "Time", 
-     main = "The relationship between 
-     connectivity and duration of a state", bty = 'n', pch = 19)
-
-################## Irrelevant stuff################## 
-
-# The symptom states
-symptom <- matrix(data = NA, nrow = t, ncol = ncol(md_data))
-symptoms <- rep(list(x = symptom), nsim)
-for(i in 1:nsim) {
-  symptoms[[i]] <- t(results[[i]]$symptoms)
-  dimnames(x = symptoms[[i]]) <- list( c("dep.mood", "loss.int", "w.loss", "w.gain", "dec.app", 
-                                        "inc.app", "insomnia", "hypsomnia", "psycm.agit", 
-                                        "psycm.ret", "fatigue", "worth", "conc.prob", "death"), 
-                                       paste0("t", 1:t, ""))
-}
-names(x = symptoms) <- paste0("Network", 1:nsim, "")
-
-# A function for the symptom level 
-symptom <- function(L) {
-  events <- matrix(nrow = nsim, ncol = 14)
-  times <- matrix(nrow = nsim, ncol = 14)
-  
-  for(l in 1:length(L)) {
-    X <- L[[l]]
-    
-    start <- numeric(length = nrow(X))
-    for(i in 1:nrow(X)) {
-      start[i] <- which(X[i,] == 1)[1] # index when the network is depressed for the first time
-      }
-    time <- numeric(length = nrow(X))
-    event <- numeric(length = nrow(X))
-    
-    for(i in 1:nrow(X)) {
-      for(j in start[i]:ncol(X)) { # start counting time from the first depressed point on 
-        if(X[i, j] == 1 & j < ncol(X)) {
-          time[i] <- time[i] + 1
-          } else if(X[i, j] == 1 & j == ncol(X)) {
-            time[i] <- time[i]
-            event[i] <- 0
-            } else if(X[i, j] == 0) {
-              time[i] <- time[i]
-              event[i] <- 1
-              break 
-            }
-        }
-    }
-    events[l,] <- event
-    dimnames(events) <- list(paste0("Network", 1:nsim, ""), 
-                             c("dep.mood", "loss.int", "w.loss", "w.gain", "dec.app", "inc.app", 
-                               "insomnia", "hypsomnia", "psycm.agit", "psycm.ret", "fatigue", 
-                               "worth", "conc.prob", "death"))
-    times[l,] <- time
-    dimnames(times) <- list(paste0("Network", 1:nsim, ""), 
-                                 c("dep.mood", "loss.int", "w.loss", "w.gain", "dec.app", "inc.app", 
-                                   "insomnia", "hypsomnia", "psycm.agit", "psycm.ret", "fatigue", 
-                                   "worth", "conc.prob", "death"))
-  }
-  data <- list('events' = events, 'times' = times)
-  return(data)
-}
-
-data <- symptom(L = symptoms)
-
-dep_times <- cbind(data$times[,'dep.mood'])
-dep_event <- cbind(data$events[,'dep.mood'])
-
-lossint_times <- cbind(data$times[, 'loss.int'])
-lossint_event <- cbind(data$events[, 'loss.int'])
-
-decapp_times <- cbind(data$times[,'dec.app'])
-decapp_events <- cbind(data$events[,'dec.app'])
-
-w.loss_times <- cbind(data$times[,'w.loss'])
-w.loss_events <- cbind(data$events[,'w.loss'])
-
-fatigue_times <- cbind(data$times[,'fatigue'])
-fatigue_events <- cbind(data$events[,'fatigue'])
-
-worth_times <- cbind(data$times[,'worth'])
-worth_events <- cbind(data$events[,'worth'])
-
-death_times <- cbind(data$times[,'death'])
-death_events <- cbind(data$events[,'death'])
-
-conc_times <- cbind(data$times[,'conc.prob'])
-conc_events <- cbind(data$events[,'conc.prob'])
-
-insom_times <- cbind(data$times[,'insomnia'])
-insom_events <- cbind(data$events[,'insomnia'])
-
-hist(lossint_times, breaks = 25, main = "Failure time distribution of loss of interest", xlab = "Time")
-legend(x = "center", legend = c(paste("c", "=", c), paste("time", "=", t), paste("nsim", "=", nsim)))
-data <- data.frame('time' = lossint_times, 'event' = lossint_event)
