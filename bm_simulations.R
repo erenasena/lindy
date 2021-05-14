@@ -100,7 +100,7 @@ my_gbm <- function(nsim, t0, t, n, X0, mu, sigma, L, R){
 
 ### Simulations
 RNGkind("L'Ecuyer-CMRG") # this is the random number generator needed in parallel processing 
-detectCores() # tells you the number of cores your computer can use for the simulations 
+nCores <- detectCores() # tells you the number of cores your computer can use for the simulations 
 
 ## Storing the values: These two functions will allow us to nealty store the resutls. It is easier to 
 ## define them before running the simulations. I wrote them because the results of parallel simulations are a mess. 
@@ -146,7 +146,7 @@ f <- function(i){ # specify the desired function and parameter values here
 }
 
 set.seed(1)
-res <- mclapply(X = 1:100, f, mc.cores = 8, mc.set.seed = TRUE)
+res <- mclapply(X = 1:100, f, mc.cores = nCores, mc.set.seed = TRUE)
 
 v <- values(x = res, nsim = 100, n = 1000) # indexing the BM values 
 m_val <- v[[1]] # BM values in a matrix (goes into the plotting function)
